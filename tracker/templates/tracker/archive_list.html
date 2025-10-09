@@ -1,0 +1,132 @@
+{% extends 'tracker/base.html' %}
+
+{% block title %}Cohort Archives - Badge Tracker{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'trainee_list' %}" class="btn">← Back to Current Cohort</a>
+</div>
+
+<div class="card">
+    <h2>Cohort Archives</h2>
+    {% if current_cohort %}
+    <p style="color: #666; margin-top: 10px;">
+        Current cohort: <strong>{{ current_cohort.name }}</strong>
+    </p>
+    {% endif %}
+</div>
+
+<!-- Global Search Box -->
+<div class="card">
+    <h3>Search All Cohorts</h3>
+    <p style="color: #666; margin-bottom: 15px;">Search across all trainees in all cohorts by badge number or name</p>
+    <form method="GET" action="{% url 'archive_list' %}" style="display: flex; gap: 10px; align-items: center;">
+        <input
+            type="text"
+            name="search"
+            value="{{ search_query }}"
+            placeholder="Enter badge number or name..."
+            style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+            autofocus
+        >
+        <button type="submit" class="btn btn-success">Search</button>
+        {% if search_query %}
+            <a href="{% url 'archive_list' %}" class="btn" style="background: #95a5a6;">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Search Results -->
+{% if search_query %}
+    <div class="card">
+        <h3>Search Results</h3>
+        {% if search_results %}
+            <p style="color: #666; margin-bottom: 15px;">
+                Found <strong>{{ search_results|length }}</strong> trainee{{ search_results|length|pluralize }} matching "{{ search_query }}"
+            </p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Badge Number</th>
+                        <th>Name</th>
+                        <th>Cohort</th>
+                        <th>Progress</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in search_results %}
+                    <tr>
+                        <td><strong>{{ item.trainee.badge_number }}</strong></td>
+                        <td>{{ item.trainee.full_name }}</td>
+                        <td>
+                            <span style="color: #3498db;">{{ item.trainee.cohort.name }}</span>
+                        </td>
+                        <td>
+                            <div class="progress-bar" style="max-width: 200px;">
+                                <div class="progress-bar-fill" style="width: {{ item.progress }}%;">
+                                    {{ item.progress }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <a href="{% url 'trainee_detail' item.trainee.badge_number %}" class="btn">View Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="text-align: center; color: #666; padding: 20px;">
+                No trainees found matching "{{ search_query }}"
+            </p>
+        {% endif %}
+    </div>
+{% endif %}
+
+<!-- Cohorts List -->
+{% if cohorts %}
+    <div class="card">
+        <h3>Available Cohorts</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Cohort</th>
+                    <th>Period</th>
+                    <th>Trainees</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cohorts %}
+                <tr>
+                    <td><strong>{{ item.cohort.name }}</strong></td>
+                    <td>
+                        {{ item.cohort.start_date|date:"M d, Y" }} - {{ item.cohort.end_date|date:"M d, Y" }}
+                    </td>
+                    <td>{{ item.trainee_count }} trainee{{ item.trainee_count|pluralize }}</td>
+                    <td>
+                        {% if item.is_past %}
+                            <span style="color: #7f8c8d;">Past</span>
+                        {% else %}
+                            <span style="color: #3498db;">Future</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <a href="{% url 'archive_detail' item.cohort.id %}" class="btn">View Trainees</a>
+                            <a href="{% url 'export_cohort' item.cohort.id %}" class="btn btn-success">Export Excel</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="card">
+        <p style="text-align: center; color: #666;">No archived cohorts available.</p>
+    </div>
+{% endif %}
+{% endblock %}

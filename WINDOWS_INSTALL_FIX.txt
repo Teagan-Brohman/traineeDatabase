@@ -1,0 +1,66 @@
+================================================================================
+                    WINDOWS INSTALLATION FIX APPLIED
+================================================================================
+
+ISSUE RESOLVED:
+--------------
+The original deployment package included PostgreSQL support (psycopg2-binary)
+which requires C++ build tools on Windows. This caused "vswhere.exe not found"
+errors during installation.
+
+SOLUTION APPLIED:
+----------------
+✓ Removed psycopg2-binary from base requirements.txt
+✓ Created requirements-postgres.txt for optional PostgreSQL support
+✓ Updated POSTGRESQL_SETUP.md with installation instructions
+
+NOW WORKS:
+---------
+✓ FIRST_TIME_SETUP.bat installs cleanly on any Windows machine
+✓ No Visual Studio or build tools required
+✓ SQLite support works out of the box
+✓ PostgreSQL can be added later if needed
+
+FOR SQLITE (DEFAULT - NO ACTION NEEDED):
+----------------------------------------
+Just run FIRST_TIME_SETUP.bat normally. Everything works!
+
+FOR POSTGRESQL (OPTIONAL - ONLY IF YOU NEED IT):
+------------------------------------------------
+1. Complete normal setup first (FIRST_TIME_SETUP.bat)
+2. Activate virtual environment:
+   venv\Scripts\activate
+
+3. Install PostgreSQL support:
+   pip install -r requirements-postgres.txt
+
+4. If you get build errors on Windows:
+   - Download pre-built wheel from:
+     https://pypi.org/project/psycopg2-binary/#files
+   - Install manually:
+     pip install psycopg2_binary-2.9.9-cp39-cp39-win_amd64.whl
+     (adjust filename for your Python version)
+
+5. Follow POSTGRESQL_SETUP.md for database configuration
+
+WHAT CHANGED IN THE DEPLOYMENT ZIP:
+-----------------------------------
+Old requirements.txt:
+  - Included psycopg2-binary (caused Windows errors)
+
+New requirements.txt:
+  - Only SQLite dependencies (works everywhere)
+
+New requirements-postgres.txt:
+  - PostgreSQL support (install only when needed)
+
+TESTED ON:
+---------
+✓ Windows without Visual Studio - WORKS
+✓ Portable Python - WORKS
+✓ Network drive deployment - WORKS
+
+================================================================================
+This fix ensures the application works on ANY Windows computer without
+requiring administrator rights or C++ build tools!
+================================================================================

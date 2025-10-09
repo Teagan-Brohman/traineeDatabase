@@ -1,0 +1,36 @@
+================================================================================
+                        TRAINEE BADGE TRACKER
+                    Welcome! Here's how to start:
+================================================================================
+
+FOR NON-TECHNICAL USERS (Recommended):
+--------------------------------------
+1. Read: HOW_TO_USE.txt
+2. If using portable Python: Edit PYTHON_PATH.txt first (see HOW_TO_USE.txt)
+3. Double-click: FIRST_TIME_SETUP.bat (first time only)
+4. Double-click: START_SERVER.bat (each time you use the app)
+
+FOR TECHNICAL USERS:
+-------------------
+1. Read: QUICKSTART.md
+2. Or follow standard Django setup procedures
+
+GETTING HELP:
+------------
+- HOW_TO_USE.txt - Simple instructions for everyone
+- QUICKSTART.md - Quick technical guide
+- README.md - Full documentation
+- CLAUDE.md - Developer/architecture documentation
+
+IMPORTANT FILES:
+---------------
+START_SERVER.bat - Double-click to start the application
+FIRST_TIME_SETUP.bat - Run once for initial setup
+STOP_SERVER.bat - Force stop the server if needed
+HOW_TO_USE.txt - Beginner-friendly instructions
+PYTHON_PATH.txt - Configure portable Python path (optional)
+db.sqlite3 - Your database (BACKUP THIS REGULARLY!)
+
+================================================================================
+Questions? Read HOW_TO_USE.txt first!
+================================================================================

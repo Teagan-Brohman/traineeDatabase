@@ -1,0 +1,46 @@
+REM ========================================
+REM Python Path Configuration (OPTIONAL)
+REM ========================================
+REM
+REM If you have a PORTABLE Python installation that's NOT in your system PATH,
+REM you can specify its location here.
+REM
+REM INSTRUCTIONS:
+REM 1. Delete the "REM" at the start of ONE line below
+REM 2. Replace the path with YOUR Python installation path
+REM 3. Save this file
+REM
+REM NOTE: If this is NOT set, the scripts will look for Python in your system PATH
+REM ========================================
+
+REM ---- CHOOSE ONE OPTION BELOW (Delete "REM" and modify path) ----
+
+REM Option 1: Portable Python on C: drive
+REM SET PYTHON_PATH=C:\PortablePython\python.exe
+
+REM Option 2: Portable Python on network drive (Z:, N:, etc)
+REM SET PYTHON_PATH=Z:\SharedTools\Python\python.exe
+
+REM Option 3: Python in Program Files (if not in PATH)
+REM SET PYTHON_PATH=C:\Program Files\Python39\python.exe
+
+REM Option 4: Python in AppData
+REM SET PYTHON_PATH=C:\Users\YourUsername\AppData\Local\Programs\Python\Python39\python.exe
+
+REM Option 5: WinPython portable
+REM SET PYTHON_PATH=C:\WinPython\python-3.9.7.amd64\python.exe
+
+REM Option 6: Anaconda/Miniconda
+REM SET PYTHON_PATH=C:\Anaconda3\python.exe
+
+REM Option 7: Custom location (edit this!)
+REM SET PYTHON_PATH=C:\Your\Custom\Path\python.exe
+
+REM ========================================
+REM HOW TO FIND YOUR PYTHON PATH:
+REM ========================================
+REM 1. Open Command Prompt
+REM 2. Type: where python
+REM 3. Copy the full path shown
+REM 4. Paste it above after "SET PYTHON_PATH="
+REM ========================================

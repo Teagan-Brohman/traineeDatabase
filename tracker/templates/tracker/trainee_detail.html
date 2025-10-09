@@ -1,0 +1,216 @@
+{% extends 'tracker/base.html' %}
+
+{% block title %}{{ trainee.full_name }} - Badge Tracker{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{% url 'trainee_list' %}" class="btn">← Back to List</a>
+</div>
+
+<div class="card">
+    <h2>{{ trainee.full_name }}</h2>
+    <p><strong>Badge Number:</strong> {{ trainee.badge_number }}</p>
+    <p><strong>Cohort:</strong> {{ trainee.cohort }}</p>
+    <p><strong>Overall Progress:</strong></p>
+    <div class="progress-bar" style="max-width: 400px;">
+        <div class="progress-bar-fill" style="width: {{ progress_percentage }}%;">
+            {{ progress_percentage }}%
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Training Tasks</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 50px;">#</th>
+                <th>Task</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Signed By</th>
+                <th>Date</th>
+                <th>Score</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in task_progress %}
+            <tr>
+                <td>{{ item.task.order }}</td>
+                <td>
+                    {{ item.task.name }}
+                    {% if item.task.description %}
+                        <br><small style="color: #666;">{{ item.task.description }}</small>
+                    {% endif %}
+                </td>
+                <td>{{ item.task.category|default:"-" }}</td>
+                <td>
+                    {% if item.signoff %}
+                        <span class="completed">✓ Completed</span>
+                    {% else %}
+                        <span class="pending">Pending</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.signoff %}
+                        {{ item.signoff.signed_by.get_full_name|default:item.signoff.signed_by.username }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.signoff %}
+                        {{ item.signoff.signed_at|date:"m/d/Y g:i A" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.signoff and item.signoff.score %}
+                        {{ item.signoff.score }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not item.signoff %}
+                        {% if item.can_sign_off %}
+                            <button onclick="openSignOffModal('{{ item.task.id }}', '{{ item.task.name|escapejs }}', {{ item.task.requires_score|yesno:'true,false' }}, '{{ item.task.minimum_score|default:'' }}')" class="btn btn-success">
+                                Sign Off
+                            </button>
+                        {% else %}
+                            <button class="btn" disabled title="You are not authorized to sign off this task">
+                                Not Authorized
+                            </button>
+                        {% endif %}
+                    {% else %}
+                        <div style="display: flex; gap: 5px;">
+                            {% if item.can_sign_off %}
+                                <button onclick="openSignOffModal('{{ item.task.id }}', '{{ item.task.name|escapejs }}', {{ item.task.requires_score|yesno:'true,false' }}, '{{ item.task.minimum_score|default:'' }}')" class="btn">
+                                    Update
+                                </button>
+                            {% endif %}
+                            {% if item.can_unsign %}
+                                <button onclick="openUnsignModal('{{ item.task.id }}', '{{ item.task.name|escapejs }}')" class="btn btn-danger btn-small">
+                                    Unsign
+                                </button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center;">No tasks configured. Add tasks in the admin panel.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Sign Off Modal -->
+<div id="signOffModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; max-width: 500px; width: 90%;">
+        <h3 id="modalTitle">Sign Off Task</h3>
+        <form method="POST" id="signOffForm">
+            {% csrf_token %}
+            <div style="margin: 20px 0;">
+                <label for="score" style="display: block; margin-bottom: 5px;">Score (if applicable):</label>
+                <input type="text" name="score" id="score" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin: 20px 0;">
+                <label for="notes" style="display: block; margin-bottom: 5px;">Notes:</label>
+                <textarea name="notes" id="notes" rows="4" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeSignOffModal()" class="btn" style="background: #95a5a6;">Cancel</button>
+                <button type="submit" class="btn btn-success">Confirm Sign Off</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openSignOffModal(taskId, taskName, requiresScore, minScore) {
+    document.getElementById('modalTitle').textContent = 'Sign Off: ' + taskName;
+    document.getElementById('signOffForm').action = '{% url 'trainee_detail' trainee.badge_number %}'.replace('{{ trainee.badge_number }}', '{{ trainee.badge_number }}') + 'signoff/' + taskId + '/';
+
+    const scoreField = document.getElementById('score');
+    const scoreLabel = scoreField.parentElement.querySelector('label');
+
+    if (requiresScore) {
+        scoreField.parentElement.style.display = 'block';
+
+        // Update label to show minimum score if set
+        if (minScore && minScore !== '') {
+            scoreLabel.innerHTML = 'Score (required - minimum: ' + minScore + '):';
+            scoreField.setAttribute('required', 'required');
+            scoreField.setAttribute('min', minScore);
+            scoreField.setAttribute('type', 'number');
+            scoreField.setAttribute('step', '0.01');
+        } else {
+            scoreLabel.textContent = 'Score (if applicable):';
+            scoreField.removeAttribute('required');
+            scoreField.removeAttribute('min');
+            scoreField.setAttribute('type', 'text');
+        }
+    } else {
+        scoreField.parentElement.style.display = 'none';
+        scoreField.removeAttribute('required');
+    }
+
+    document.getElementById('signOffModal').style.display = 'block';
+}
+
+function closeSignOffModal() {
+    document.getElementById('signOffModal').style.display = 'none';
+    document.getElementById('signOffForm').reset();
+}
+
+// Close modal when clicking outside
+document.getElementById('signOffModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeSignOffModal();
+    }
+});
+
+// Unsign Modal Functions
+function openUnsignModal(taskId, taskName) {
+    document.getElementById('unsignModalTitle').textContent = 'Remove Sign-Off: ' + taskName;
+    document.getElementById('unsignForm').action = '{% url 'trainee_detail' trainee.badge_number %}'.replace('{{ trainee.badge_number }}', '{{ trainee.badge_number }}') + 'unsign/' + taskId + '/';
+    document.getElementById('unsignModal').style.display = 'block';
+}
+
+function closeUnsignModal() {
+    document.getElementById('unsignModal').style.display = 'none';
+    document.getElementById('unsignForm').reset();
+}
+
+// Close unsign modal when clicking outside
+document.getElementById('unsignModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeUnsignModal();
+    }
+});
+</script>
+
+<!-- Unsign Modal -->
+<div id="unsignModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; max-width: 500px; width: 90%;">
+        <h3 id="unsignModalTitle" style="color: #e74c3c;">Remove Sign-Off</h3>
+        <p style="margin: 15px 0; color: #666;">Are you sure you want to remove this sign-off? This action will be logged in the audit trail.</p>
+        <form method="POST" id="unsignForm">
+            {% csrf_token %}
+            <div style="margin: 20px 0;">
+                <label for="unsignReason" style="display: block; margin-bottom: 5px;">Reason for removal (optional):</label>
+                <textarea name="reason" id="unsignReason" rows="3" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="e.g., Entered in error, needs re-training"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeUnsignModal()" class="btn" style="background: #95a5a6;">Cancel</button>
+                <button type="submit" class="btn btn-danger">Confirm Removal</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

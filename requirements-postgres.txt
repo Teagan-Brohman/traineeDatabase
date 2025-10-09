@@ -1,0 +1,19 @@
+# PostgreSQL Support (Optional)
+# Only install this if you're migrating from SQLite to PostgreSQL
+# See POSTGRESQL_SETUP.md for instructions
+
+# Install base requirements first:
+# pip install -r requirements.txt
+
+# Then install PostgreSQL support:
+psycopg2-binary==2.9.9
+
+# NOTE: On Windows, if you get build errors, you have two options:
+#
+# Option 1: Install pre-built wheel manually
+#   Download from: https://pypi.org/project/psycopg2-binary/#files
+#   Then: pip install psycopg2_binary-2.9.9-cp39-cp39-win_amd64.whl
+#
+# Option 2: Install Visual Studio Build Tools
+#   Download from: https://visualstudio.microsoft.com/downloads/
+#   Select "Desktop development with C++"
