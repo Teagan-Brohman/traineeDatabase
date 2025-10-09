@@ -1,0 +1,308 @@
+================================================================================
+                    OFFLINE INSTALLATION GUIDE
+                   Pre-Built Wheels for Windows
+================================================================================
+
+OVERVIEW:
+--------
+This deployment package includes pre-built Python packages (wheels) that allow
+installation WITHOUT an internet connection and WITHOUT C++ build tools.
+
+The "wheels" folder contains 56 MB of pre-compiled packages that work with
+Python 3.11 and 3.12 (64-bit Windows).
+
+================================================================================
+                        WHAT ARE WHEELS?
+================================================================================
+
+Wheels are pre-compiled Python packages that:
+✓ Install instantly (no compilation needed)
+✓ Work offline (no internet required)
+✓ Don't require Visual Studio C++ build tools
+✓ Are platform and Python-version specific
+
+The alternative is "source distributions" which:
+✗ Require compilation during installation
+✗ Need Visual Studio C++ build tools
+✗ Take much longer to install
+✗ Can fail if build tools are missing
+
+================================================================================
+                    WHAT'S IN THE WHEELS FOLDER?
+================================================================================
+
+14 wheel files totaling 56 MB:
+
+PYTHON 3.11 WHEELS (for cp311):
+  - numpy-2.3.3-cp311-cp311-win_amd64.whl (13 MB)
+  - pandas-2.3.3-cp311-cp311-win_amd64.whl (11 MB)
+
+PYTHON 3.12 WHEELS (for cp312):
+  - numpy-2.3.3-cp312-cp312-win_amd64.whl (13 MB)
+  - pandas-2.3.3-cp312-cp312-win_amd64.whl (11 MB)
+
+UNIVERSAL WHEELS (work with any Python 3.x):
+  - Django-5.2.7-py3-none-any.whl (8.0 MB)
+  - asgiref-3.10.0-py3-none-any.whl (24 KB)
+  - et_xmlfile-2.0.0-py3-none-any.whl (18 KB)
+  - openpyxl-3.1.5-py2.py3-none-any.whl (246 KB)
+  - python_dateutil-2.9.0.post0-py2.py3-none-any.whl (225 KB)
+  - python_decouple-3.8-py3-none-any.whl (10 KB)
+  - pytz-2025.2-py2.py3-none-any.whl (498 KB)
+  - six-1.17.0-py2.py3-none-any.whl (11 KB)
+  - sqlparse-0.5.3-py3-none-any.whl (44 KB)
+  - tzdata-2025.2-py2.py3-none-any.whl (340 KB)
+
+================================================================================
+                    HOW OFFLINE INSTALLATION WORKS
+================================================================================
+
+When you run FIRST_TIME_SETUP.bat, it automatically:
+
+STEP 1: Check for wheels folder
+  - If found, proceed to Step 2
+  - If not found, download from internet (PyPI)
+
+STEP 2: Try offline installation
+  Command: pip install --no-index --find-links=wheels -r requirements.txt
+  - --no-index = Don't use internet
+  - --find-links=wheels = Use local wheels folder
+
+STEP 3A: If offline install succeeds
+  - All packages installed from local wheels
+  - Fast installation (seconds, not minutes)
+  - Message: "[SUCCESS] Offline installation completed!"
+
+STEP 3B: If offline install fails
+  - Usually means Python version mismatch
+  - Automatically falls back to online installation
+  - Message: "[WARN] Offline installation failed"
+  - Downloads from PyPI instead
+
+================================================================================
+                    SUPPORTED CONFIGURATIONS
+================================================================================
+
+FULLY SUPPORTED (Offline installation works):
+✓ Windows 10/11 (64-bit)
+✓ Python 3.11.x (64-bit)
+✓ Python 3.12.x (64-bit)
+✓ No internet connection needed
+✓ No Visual Studio required
+
+PARTIALLY SUPPORTED (Requires internet):
+⚠ Python 3.10 (wheels not available, downloads from PyPI)
+⚠ Python 3.13+ (wheels not yet included, downloads from PyPI)
+⚠ 32-bit Python (pandas doesn't support recent 32-bit versions)
+⚠ Linux/Mac (wheels are Windows-specific)
+
+NOT SUPPORTED:
+✗ Python 3.9 or older (Django 5.2.7 requires Python 3.10+)
+✗ Windows 7 32-bit (no modern pandas support)
+
+================================================================================
+                    TROUBLESHOOTING
+================================================================================
+
+PROBLEM: "Offline installation failed" warning appears
+CAUSE: Your Python version doesn't match the bundled wheels
+SOLUTION:
+  - Check your Python version: python --version
+  - If Python 3.10: Installation will automatically download from internet
+  - If Python 3.13+: Installation will automatically download from internet
+  - If Python 3.11 or 3.12: Check that it's 64-bit, not 32-bit
+
+PROBLEM: "No matching distribution found for numpy"
+CAUSE: Python version incompatibility
+SOLUTION:
+  - Upgrade to Python 3.11 or 3.12 (64-bit)
+  - OR enable internet connection for automatic download
+
+PROBLEM: "ERROR: Failed to install packages from PyPI"
+CAUSE: Offline install failed AND no internet connection
+SOLUTION:
+  - Install Python 3.11 or 3.12 (64-bit) for offline support
+  - OR connect to internet for automatic package download
+
+PROBLEM: Installation is very slow or tries to compile
+CAUSE: Wheels not being used (either missing or wrong version)
+SOLUTION:
+  - Ensure wheels/ folder exists in application directory
+  - Verify Python version: python --version
+  - Should see "[INFO] Pre-built packages found!" message
+
+PROBLEM: "vswhere.exe not found" or "Visual C++ required"
+CAUSE: pip is trying to compile packages from source
+SOLUTION:
+  - This shouldn't happen if wheels are present
+  - Check that wheels/ folder exists
+  - Use Python 3.11 or 3.12 (64-bit)
+  - The whole point of bundled wheels is to avoid this!
+
+================================================================================
+                    ADVANCED: MANUAL INSTALLATION
+================================================================================
+
+If automatic installation fails, you can install manually:
+
+1. Open Command Prompt in application directory
+2. Activate virtual environment:
+   venv\Scripts\activate
+3. Install from local wheels:
+   pip install --no-index --find-links=wheels -r requirements.txt
+
+To install a specific wheel manually:
+   pip install wheels\numpy-2.3.3-cp312-cp312-win_amd64.whl
+
+To force online installation (ignore wheels):
+   pip install -r requirements.txt
+
+================================================================================
+                    UPDATING WHEELS
+================================================================================
+
+If you need to update the bundled wheels (for future versions):
+
+1. Activate virtual environment
+2. Download updated wheels:
+
+   For Python 3.11:
+   pip download --only-binary=:all: --platform win_amd64
+                --python-version 3.11 -r requirements.txt --dest wheels/
+
+   For Python 3.12:
+   pip download --only-binary=:all: --platform win_amd64
+                --python-version 3.12 -r requirements.txt --dest wheels/
+
+3. This will download new versions and replace old ones
+
+================================================================================
+                    WHY PYTHON 3.11-3.12 ONLY?
+================================================================================
+
+NUMPY 2.3.3 REQUIREMENTS:
+- numpy 2.3.3 requires Python 3.11+ (released in 2024)
+- numpy 2.2.6 is the last version supporting Python 3.10
+- We chose to use the latest stable numpy
+
+DJANGO 5.2.7 REQUIREMENTS:
+- Django 5.2.7 requires Python 3.10+
+- Compatible with Python 3.10, 3.11, 3.12, 3.13
+
+COMPATIBILITY DECISION:
+- Chose Python 3.11-3.12 as the "sweet spot"
+- Modern, stable, widely available
+- Supports latest numpy and Django
+- Most portable Python distributions offer 3.11-3.12
+
+ALTERNATIVE APPROACHES:
+If you need Python 3.10 support:
+1. Downgrade numpy to 2.2.6 in requirements.txt
+2. Regenerate wheels for Python 3.10
+3. Accept that users will need internet connection
+
+If you need Python 3.13+ support:
+1. Wait for developers to add 3.13 wheels
+2. OR let users download from PyPI automatically
+
+================================================================================
+                    TECHNICAL DETAILS
+================================================================================
+
+WHEEL FILE NAMING:
+numpy-2.3.3-cp312-cp312-win_amd64.whl
+  │      │    │     │       │
+  │      │    │     │       └─ Platform: Windows 64-bit (AMD64)
+  │      │    │     └────────── ABI: CPython 3.12
+  │      │    └──────────────── Python version: CPython 3.12
+  │      └───────────────────── Package version: 2.3.3
+  └──────────────────────────── Package name: numpy
+
+py3-none-any.whl
+  │   │    │
+  │   │    └─ Platform: Any (pure Python)
+  │   └────── ABI: None (pure Python)
+  └────────── Python version: Any Python 3.x
+
+INSTALLATION PRIORITY:
+1. Try: wheels/ folder (offline, fast)
+2. Fall back: PyPI index (online, automatic)
+
+pip automatically selects the correct wheel based on:
+- Python version (3.11, 3.12, etc.)
+- Python implementation (CPython, PyPy, etc.)
+- Operating system (Windows, Linux, Mac)
+- Architecture (64-bit, 32-bit, ARM)
+
+================================================================================
+                    BENEFITS OF BUNDLED WHEELS
+================================================================================
+
+FOR USERS:
+✓ No internet required for installation
+✓ No C++ build tools needed
+✓ Faster installation (seconds vs minutes)
+✓ More reliable (no compilation failures)
+✓ Works on network drives
+✓ Works in restricted environments
+
+FOR ADMINISTRATORS:
+✓ Easier deployment to multiple computers
+✓ Consistent installation experience
+✓ No firewall/proxy issues
+✓ No Visual Studio licensing concerns
+✓ Predictable package versions
+✓ Reduced support burden
+
+FOR ORGANIZATIONS:
+✓ Offline installation for secure networks
+✓ No external dependencies during setup
+✓ Audit trail of exact package versions
+✓ No surprise updates from PyPI
+✓ Compliance with security policies
+
+================================================================================
+                    FREQUENTLY ASKED QUESTIONS
+================================================================================
+
+Q: Why is the deployment package so much larger now?
+A: The wheels folder adds 56 MB, but eliminates the need for internet and
+   build tools. This is a fair trade-off for most users.
+
+Q: Can I delete the wheels folder to save space?
+A: Yes, but installation will require internet connection and may fail on
+   computers without C++ build tools.
+
+Q: Will this work on Mac or Linux?
+A: No, these wheels are Windows-specific. Mac/Linux users should install
+   normally with pip (packages compile automatically on those platforms).
+
+Q: Can I use Python 3.10?
+A: Yes, but offline installation won't work. Setup will automatically download
+   packages from internet instead.
+
+Q: What if I don't have internet and don't have Python 3.11-3.12?
+A: You'll need to either:
+   1. Install Python 3.11 or 3.12, OR
+   2. Download packages on a different computer and manually transfer wheels
+
+Q: Do I need to update the wheels when I update Python?
+A: Only if you upgrade from 3.11 to 3.12 or vice versa. The wheels work for
+   all minor versions (e.g., 3.12.0, 3.12.1, 3.12.2 all use same wheel).
+
+Q: Why not just include Visual Studio redistributables?
+A: Microsoft licensing restricts redistribution. Pre-built wheels are legal
+   and don't have the same restrictions.
+
+================================================================================
+                    RELATED DOCUMENTATION
+================================================================================
+
+HOW_TO_USE.txt - Complete setup guide with offline installation notes
+DEPLOYMENT_README.txt - Full deployment package documentation
+WINDOWS_INSTALL_FIX.txt - Explanation of vswhere.exe error fix
+FIRST_TIME_SETUP.bat - Automated setup script with wheel support
+
+================================================================================
+                    END OF OFFLINE INSTALLATION GUIDE
+================================================================================

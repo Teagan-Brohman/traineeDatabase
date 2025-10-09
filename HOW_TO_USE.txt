@@ -14,17 +14,23 @@ It runs on ONE computer and everyone accesses it through their web browser.
 
 OPTION A - Standard Python Installation (Recommended):
 ------------------------------------------------------
-1. Make sure Python is installed on your computer
+1. Make sure Python 3.11 or 3.12 (64-bit) is installed on your computer
    - If not installed, download from: https://www.python.org/downloads/
    - During installation, CHECK the box "Add Python to PATH"
-   - Any Python version 3.8 or higher works
+   - IMPORTANT: Must be Python 3.11 or 3.12 (64-bit) for bundled packages
 
 2. Double-click: FIRST_TIME_SETUP.bat
    - Follow the prompts
    - Create an admin username and password (WRITE IT DOWN!)
    - Wait for "SETUP COMPLETE!" message
 
-3. Done! Setup is complete.
+3. BONUS: Pre-built packages are included!
+   - The "wheels" folder contains all required packages
+   - Setup works WITHOUT internet connection
+   - No C++ build tools required
+   - Installation is much faster
+
+4. Done! Setup is complete.
 
 
 OPTION B - Portable Python (For Network Drive without Installation):
@@ -149,7 +155,7 @@ EXPORT COHORT DATA TO EXCEL:
 
 PROBLEM: "Python is not installed" or "Python is not found"
 SOLUTION:
-  Option 1: Install Python from python.org
+  Option 1: Install Python 3.11 or 3.12 (64-bit) from python.org
             During install, check "Add Python to PATH"
 
   Option 2: If you have portable Python, configure PYTHON_PATH.txt
@@ -158,6 +164,24 @@ SOLUTION:
             3. Set the full path to your python.exe
                Example: SET PYTHON_PATH=C:\PortablePython\python.exe
             4. Save and try again
+
+PROBLEM: "Failed to install packages" or "vswhere.exe not found"
+SOLUTION:
+  - Make sure you have Python 3.11 or 3.12 (64-bit)
+  - The bundled wheels in the "wheels" folder only work with these versions
+  - If you have Python 3.10 or older, you'll need:
+    * Internet connection (to download from PyPI), OR
+    * Upgrade to Python 3.11 or 3.12
+  - Check your Python version: python --version
+
+PROBLEM: "Offline installation failed" warning
+SOLUTION:
+  - This means pre-built packages didn't match your Python version
+  - Setup will automatically try downloading from internet (PyPI)
+  - To use offline installation:
+    * Make sure you have Python 3.11 or 3.12 (64-bit)
+    * The "wheels" folder must be present
+  - See OFFLINE_INSTALL.txt for more details
 
 PROBLEM: Can't access from other computers
 SOLUTION:

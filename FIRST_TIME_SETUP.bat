@@ -14,20 +14,16 @@ echo ===============================================
 echo.
 
 REM Check for custom Python path configuration
+set "PYTHON_CMD=python"
 if exist "PYTHON_PATH.txt" (
     echo [INFO] Checking for custom Python path...
-    for /f "tokens=2 delims==" %%a in ('findstr /v "^REM" PYTHON_PATH.txt ^| findstr "PYTHON_PATH"') do (
+    for /f "usebackq tokens=2* delims==" %%a in (`findstr /v "^REM" PYTHON_PATH.txt ^| findstr "PYTHON_PATH"`) do (
         set "PYTHON_CMD=%%a"
-        set "PYTHON_CMD=!PYTHON_CMD: =!"
     )
+)
 
-    if defined PYTHON_CMD (
-        echo [INFO] Using custom Python: !PYTHON_CMD!
-    ) else (
-        set "PYTHON_CMD=python"
-    )
-) else (
-    set "PYTHON_CMD=python"
+if not "%PYTHON_CMD%"=="python" (
+    echo [INFO] Using custom Python from PYTHON_PATH.txt
 )
 
 REM Check if Python is available
@@ -37,7 +33,7 @@ if errorlevel 1 (
     echo.
     echo Options to fix this:
     echo.
-    echo 1. Install Python 3.8+ from python.org
+    echo 1. Install Python 3.11 or 3.12 (64-bit) from python.org
     echo    During installation, check "Add Python to PATH"
     echo.
     echo 2. If you have portable Python, edit PYTHON_PATH.txt
@@ -90,14 +86,49 @@ echo.
 echo [STEP 4/6] Installing required packages...
 echo This may take a few minutes...
 "%PYTHON_CMD%" -m pip install --upgrade pip --quiet
-pip install -r requirements.txt
-if errorlevel 1 (
+
+REM Try offline installation first from bundled wheels
+if exist "wheels\" (
+    echo [INFO] Pre-built packages found - Attempting offline installation
+    echo [INFO] This works without internet and requires no build tools
     echo.
-    echo ERROR: Failed to install packages
-    echo Check your internet connection and try again
-    echo.
-    pause
-    exit /b 1
+    pip install --no-index --find-links=wheels -r requirements.txt >nul 2>&1
+    if errorlevel 1 (
+        echo [WARN] Offline installation failed - likely Python version mismatch
+        echo [INFO] Falling back to online installation from PyPI
+        echo.
+        pip install -r requirements.txt
+        if errorlevel 1 (
+            echo.
+            echo ERROR: Failed to install packages from PyPI
+            echo.
+            echo Possible issues:
+            echo   - No internet connection
+            echo   - Python version not supported - need Python 3.11 or 3.12
+            echo   - Package build tools missing
+            echo.
+            echo Supported: Python 3.11-3.12 64-bit Windows
+            echo Your version:
+            python --version
+            echo.
+            pause
+            exit /b 1
+        )
+    ) else (
+        echo [SUCCESS] Offline installation completed - No internet required
+        echo.
+    )
+) else (
+    echo [INFO] No pre-built packages found - downloading from PyPI
+    pip install -r requirements.txt
+    if errorlevel 1 (
+        echo.
+        echo ERROR: Failed to install packages
+        echo Check your internet connection and try again
+        echo.
+        pause
+        exit /b 1
+    )
 )
 echo Packages installed successfully!
 echo.

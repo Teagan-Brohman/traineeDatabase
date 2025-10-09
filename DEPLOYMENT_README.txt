@@ -18,6 +18,10 @@ WHAT'S INCLUDED:
 ✓ Complete documentation
 ✓ Sample Excel templates
 ✓ Test suite (28 comprehensive tests)
+✓ PRE-BUILT PACKAGES (wheels/ folder - 56 MB)
+  - Works OFFLINE without internet connection
+  - No C++ build tools required
+  - Supports Python 3.11-3.12 (64-bit Windows)
 
 WHAT'S NOT INCLUDED (Will be created automatically):
 ----------------------------------------------------
@@ -46,14 +50,22 @@ After extracting, open and read in this order:
 
 STEP 3: SETUP PYTHON (If needed)
 ---------------------------------
+IMPORTANT: Python 3.11 or 3.12 (64-bit) required for bundled packages!
+
 Option A: Install Python normally
-  - Download from https://www.python.org/downloads/
+  - Download Python 3.11 or 3.12 from https://www.python.org/downloads/
   - Check "Add Python to PATH" during installation
-  - Version 3.8 or higher required
+  - Must be 64-bit version for offline installation
 
 Option B: Use portable Python
-  - If you have portable Python, edit PYTHON_PATH.txt
+  - Use portable Python 3.11 or 3.12 (64-bit)
+  - Edit PYTHON_PATH.txt to point to your portable python.exe
   - See HOW_TO_USE.txt for detailed instructions
+
+Option C: Different Python version (requires internet)
+  - If you have Python 3.10 or other versions
+  - Setup will download packages from internet (PyPI)
+  - Pre-built wheels won't work, but online install will
 
 STEP 4: RUN FIRST TIME SETUP
 -----------------------------
@@ -84,10 +96,12 @@ DOCUMENTATION (Read these!):
 ---------------------------
 START_HERE.txt - Start here! Overview and navigation
 HOW_TO_USE.txt - Complete beginner-friendly guide
+OFFLINE_INSTALL.txt - Offline installation details
 QUICKSTART.md - Quick technical setup guide
 README.md - Full technical documentation
 CLAUDE.md - Developer/architecture documentation
 POSTGRESQL_SETUP.md - Database migration guide
+WINDOWS_INSTALL_FIX.txt - Windows compatibility notes
 FUTURE_IMPROVEMENTS.md - Planned features (Phase 3 & 4)
 
 CONFIGURATION FILES:
@@ -95,7 +109,23 @@ CONFIGURATION FILES:
 PYTHON_PATH.txt - Configure portable Python (optional)
 .env.example - Environment variable template
 requirements.txt - Python package dependencies
+requirements-postgres.txt - Optional PostgreSQL support
 .gitignore - Git ignore rules
+
+PRE-BUILT PACKAGES (wheels/ folder - 56 MB):
+--------------------------------------------
+Pre-compiled Python packages for offline installation
+✓ Works without internet connection
+✓ No C++ build tools required
+✓ Python 3.11 & 3.12 (64-bit Windows)
+
+Includes wheels for:
+  - numpy-2.3.3 (cp311 & cp312)
+  - pandas-2.3.3 (cp311 & cp312)
+  - Django-5.2.7
+  - openpyxl-3.1.5
+  - python-decouple-3.8
+  - All other dependencies (12 packages total)
 
 APPLICATION FILES:
 -----------------
@@ -132,10 +162,12 @@ Check list Orientation Blank - Copy.xlsx - Backup template
 SERVER COMPUTER (Running START_SERVER.bat):
 -------------------------------------------
 ✓ Windows 7 or higher
-✓ Python 3.8 or higher
-✓ 500 MB free disk space
+✓ Python 3.11 or 3.12 (64-bit) - For offline installation
+  OR Python 3.10+ with internet connection
+✓ 600 MB free disk space (includes 56 MB wheels)
 ✓ Network connection (for team access)
 ✓ Port 8000 available
+✓ No C++ build tools required (with bundled wheels)
 
 CLIENT COMPUTERS (Accessing via browser):
 -----------------------------------------
@@ -182,7 +214,13 @@ UPDATES:
 COMMON ISSUES:
 -------------
 Issue: "Python not found"
-Fix: Install Python or configure PYTHON_PATH.txt
+Fix: Install Python 3.11/3.12 or configure PYTHON_PATH.txt
+
+Issue: "Failed to install packages" or "vswhere.exe not found"
+Fix: Use Python 3.11 or 3.12 (64-bit), or enable internet for PyPI
+
+Issue: "Offline installation failed" warning
+Fix: Python version mismatch - will auto-fallback to online install
 
 Issue: Can't access from other computers
 Fix: Check firewall, use correct IP, ensure server is running
@@ -221,6 +259,9 @@ Version 1.0 (Current)
   - Easy batch file launchers
   - Beginner-friendly documentation
   - Multi-section Excel export fix
+  - Pre-built wheels for offline installation (56 MB)
+  - No C++ build tools required
+  - Python 3.11-3.12 support
 
 ✓ Core features
   - 15 training tasks

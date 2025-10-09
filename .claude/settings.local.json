@@ -4,7 +4,9 @@
       "Bash(source venv/bin/activate)",
       "Bash(python:*)",
       "Bash(pip install:*)",
-      "WebFetch(domain:pypi.org)"
+      "WebFetch(domain:pypi.org)",
+      "Bash(pip download:*)",
+      "Bash(pip show:*)"
     ],
     "deny": [],
     "ask": []
