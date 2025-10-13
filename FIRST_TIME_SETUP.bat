@@ -13,35 +13,67 @@ echo    TRAINEE BADGE TRACKER - First Time Setup
 echo ===============================================
 echo.
 
-REM Check for custom Python path configuration
+REM Check for bundled WinPython (highest priority)
 set "PYTHON_CMD=python"
-if exist "PYTHON_PATH.txt" (
-    echo [INFO] Checking for custom Python path...
-    for /f "usebackq tokens=2* delims==" %%a in (`findstr /v "^REM" PYTHON_PATH.txt ^| findstr "PYTHON_PATH"`) do (
-        set "PYTHON_CMD=%%a"
+set "WINPYTHON_DETECTED=0"
+
+if exist "portable_python\" (
+    echo [INFO] Checking for portable Python...
+
+    REM Check if WinPython is already extracted
+    if exist "portable_python\WPy64-312101\python\python.exe" (
+        set "PYTHON_CMD=portable_python\WPy64-312101\python\python.exe"
+        set "WINPYTHON_DETECTED=1"
+        echo [INFO] Using portable WinPython 3.12.10
+    ) else if exist "portable_python\Winpython64-3.12.10.1dot.exe" (
+        echo [INFO] Extracting WinPython portable distribution...
+        echo [INFO] This may take a minute...
+        cd portable_python
+        Winpython64-3.12.10.1dot.exe -y -o"." >nul 2>&1
+        cd ..
+        if exist "portable_python\WPy64-312101\python\python.exe" (
+            set "PYTHON_CMD=portable_python\WPy64-312101\python\python.exe"
+            set "WINPYTHON_DETECTED=1"
+            echo [SUCCESS] WinPython extracted successfully
+        ) else (
+            echo [WARN] WinPython extraction failed - will try system Python
+        )
     )
 )
 
-if not "%PYTHON_CMD%"=="python" (
-    echo [INFO] Using custom Python from PYTHON_PATH.txt
+REM Check for custom Python path configuration (if WinPython not found)
+if "%WINPYTHON_DETECTED%"=="0" (
+    if exist "PYTHON_PATH.txt" (
+        echo [INFO] Checking for custom Python path...
+        for /f "usebackq tokens=2* delims==" %%a in (`findstr /v "^REM" PYTHON_PATH.txt ^| findstr "PYTHON_PATH"`) do (
+            set "PYTHON_CMD=%%a"
+        )
+        if not "%PYTHON_CMD%"=="python" (
+            echo [INFO] Using custom Python from PYTHON_PATH.txt
+        )
+    )
 )
 
 REM Check if Python is available
-"%PYTHON_CMD%" --version >nul 2>&1
+"%PYTHON_CMD%" --version
 if errorlevel 1 (
     echo ERROR: Python is not installed or not found at: %PYTHON_CMD%
     echo.
     echo Options to fix this:
     echo.
-    echo 1. Install Python 3.11 or 3.12 (64-bit) from python.org
+    echo 1. Add WinPython to portable_python/ folder (see portable_python/README.txt)
+    echo    Download: https://github.com/winpython/winpython/releases
+    echo    File: Winpython64-3.12.10.1dot.exe (23 MB)
+    echo.
+    echo 2. Install Python 3.10-3.13 (64-bit) from python.org
     echo    During installation, check "Add Python to PATH"
     echo.
-    echo 2. If you have portable Python, edit PYTHON_PATH.txt
+    echo 3. If you have portable Python, edit PYTHON_PATH.txt
     echo    Remove "REM" and set the full path to python.exe
     echo    Example: SET PYTHON_PATH=C:\PortablePython\python.exe
     echo.
     pause
-    exit /b 1
+    
 )
 
 echo [STEP 1/6] Python found!
@@ -52,7 +84,7 @@ REM Check if virtual environment exists and is valid
 echo [STEP 2/6] Checking virtual environment...
 if exist "venv\Scripts\python.exe" (
     echo Virtual environment found, testing compatibility...
-    venv\Scripts\python.exe --version >nul 2>&1
+    venv\Scripts\python.exe --version
     if errorlevel 1 (
         echo Virtual environment appears corrupted, recreating...
         rmdir /s /q venv
@@ -85,16 +117,17 @@ echo.
 
 echo [STEP 4/6] Installing required packages...
 echo This may take a few minutes...
-"%PYTHON_CMD%" -m pip install --upgrade pip --quiet
+"%PYTHON_CMD%" -m pip install --upgrade pip
 
 REM Try offline installation first from bundled wheels
 if exist "wheels\" (
     echo [INFO] Pre-built packages found - Attempting offline installation
     echo [INFO] This works without internet and requires no build tools
     echo.
-    pip install --no-index --find-links=wheels -r requirements.txt >nul 2>&1
+    pip install --no-index --find-links=wheels -r requirements.txt
     if errorlevel 1 (
-        echo [WARN] Offline installation failed - likely Python version mismatch
+        echo.
+        echo [WARN] Offline installation failed
         echo [INFO] Falling back to online installation from PyPI
         echo.
         pip install -r requirements.txt
@@ -104,16 +137,18 @@ if exist "wheels\" (
             echo.
             echo Possible issues:
             echo   - No internet connection
-            echo   - Python version not supported - need Python 3.11 or 3.12
+            echo   - Python version not supported - need Python 3.10-3.13 64-bit
             echo   - Package build tools missing
             echo.
-            echo Supported: Python 3.11-3.12 64-bit Windows
+            echo Supported: Python 3.10, 3.11, 3.12, 3.13 - 64-bit Windows only
             echo Your version:
             python --version
             echo.
             pause
             exit /b 1
         )
+        echo Packages installed successfully from PyPI
+        echo.
     ) else (
         echo [SUCCESS] Offline installation completed - No internet required
         echo.
@@ -133,7 +168,26 @@ if exist "wheels\" (
 echo Packages installed successfully!
 echo.
 
-echo [STEP 5/6] Setting up database...
+echo [STEP 5/7] Creating configuration file...
+if not exist ".env" (
+    if exist ".env.example" (
+        copy .env.example .env >nul
+        echo Configuration file created from template
+    ) else (
+        echo ERROR: .env.example file not found
+        pause
+        exit /b 1
+    )
+) else (
+    echo Configuration file already exists
+)
+if not exist "logs" (
+	mkdir logs
+	echo logs directory created
+)
+echo.
+
+echo [STEP 6/7] Setting up database...
 python manage.py migrate
 if errorlevel 1 (
     echo.
@@ -145,7 +199,7 @@ if errorlevel 1 (
 echo Database set up successfully!
 echo.
 
-echo [STEP 6/6] Creating admin user...
+echo [STEP 7/7] Creating admin user...
 echo.
 echo You will be prompted to create an administrator account.
 echo This account will be used to:

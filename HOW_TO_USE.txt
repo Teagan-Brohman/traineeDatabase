@@ -12,12 +12,35 @@ It runs on ONE computer and everyone accesses it through their web browser.
 
 !! ONLY ONE PERSON NEEDS TO DO THIS - USUALLY THE ADMINISTRATOR !!
 
-OPTION A - Standard Python Installation (Recommended):
-------------------------------------------------------
-1. Make sure Python 3.11 or 3.12 (64-bit) is installed on your computer
+OPTION A - ZERO SETUP (If WinPython is bundled - EASIEST!):
+-----------------------------------------------------------
+If the "portable_python" folder contains WinPython:
+
+1. Double-click: FIRST_TIME_SETUP.bat
+   - That's it! Python is already included.
+   - Setup automatically detects and extracts portable Python
+   - No Python installation required
+   - Works completely offline
+   - No admin rights needed
+
+2. Follow the prompts:
+   - Create an admin username and password (WRITE IT DOWN!)
+   - Wait for "SETUP COMPLETE!" message
+
+3. Done! Setup is complete.
+
+NOTE: If you don't have WinPython bundled, see portable_python/README.txt
+      or use Option B or C below.
+
+
+OPTION B - Standard Python Installation:
+----------------------------------------
+If Python is already installed OR you want to install it:
+
+1. Make sure Python 3.10-3.13 (64-bit) is installed on your computer
    - If not installed, download from: https://www.python.org/downloads/
    - During installation, CHECK the box "Add Python to PATH"
-   - IMPORTANT: Must be Python 3.11 or 3.12 (64-bit) for bundled packages
+   - Supports Python 3.10, 3.11, 3.12, or 3.13 (64-bit)
 
 2. Double-click: FIRST_TIME_SETUP.bat
    - Follow the prompts
@@ -33,8 +56,8 @@ OPTION A - Standard Python Installation (Recommended):
 4. Done! Setup is complete.
 
 
-OPTION B - Portable Python (For Network Drive without Installation):
---------------------------------------------------------------------
+OPTION C - Portable Python (Custom Location):
+---------------------------------------------
 If you have a PORTABLE Python installation that's not in your system PATH:
 
 1. Open PYTHON_PATH.txt in Notepad
@@ -148,6 +171,56 @@ EXPORT COHORT DATA TO EXCEL:
 1. Go to trainee list page
 2. Click "Export to Excel" button
 3. File will download automatically
+
+================================================================================
+                        UPDATING THE APPLICATION
+================================================================================
+
+When new versions are released, you can update without losing your data!
+
+OPTION A - Update from GitHub (If Git is installed):
+----------------------------------------------------
+1. Double-click: UPDATE_FROM_GITHUB.bat
+2. Wait for update to complete
+3. Your database and settings are automatically backed up
+4. Restart server with START_SERVER.bat
+
+OPTION B - Update from ZIP File (No Git required):
+--------------------------------------------------
+1. Download the latest update ZIP from:
+   https://github.com/Teagan-Brohman/traineeDatabase/releases
+
+2. Double-click: UPDATE_FROM_ZIP.bat
+
+3. Enter the path to the downloaded ZIP file when prompted
+   Example: C:\Downloads\traineeDatabase_UPDATE.zip
+
+4. Wait for update to complete
+
+5. Restart server with START_SERVER.bat
+
+WHAT GETS UPDATED:
+-----------------
+✓ Application code (new features and bug fixes)
+✓ Templates (UI improvements)
+✓ Dependencies (updated packages)
+✓ Database schema (automatic migrations)
+
+WHAT STAYS THE SAME:
+-------------------
+✓ Your trainee data (db.sqlite3)
+✓ Your settings (.env)
+✓ Your logs
+
+BACKUP LOCATION:
+---------------
+Before each update, a backup is created in:
+  backups\backup_YYYYMMDD_HHMMSS\
+
+If something goes wrong, you can restore:
+  1. Copy db.sqlite3 from the backup folder
+  2. Paste it into the main application folder
+  3. Restart the server
 
 ================================================================================
                             TROUBLESHOOTING

@@ -18,17 +18,23 @@ WHAT'S INCLUDED:
 ✓ Complete documentation
 ✓ Sample Excel templates
 ✓ Test suite (28 comprehensive tests)
-✓ PRE-BUILT PACKAGES (wheels/ folder - 56 MB)
+✓ PRE-BUILT PACKAGES (wheels/ folder - 108 MB)
   - Works OFFLINE without internet connection
   - No C++ build tools required
-  - Supports Python 3.11-3.12 (64-bit Windows)
+  - Supports Python 3.10, 3.11, 3.12, 3.13 (64-bit Windows)
+  - Includes PostgreSQL support (psycopg2-binary)
+✓ PORTABLE PYTHON FOLDER (portable_python/)
+  - Structure ready for WinPython bundle
+  - Instructions in portable_python/README.txt
+  - Optional - add Winpython64-3.12.10.1dot.exe (23 MB) for zero-dependency setup
+  - Makes package completely self-contained
 
 WHAT'S NOT INCLUDED (Will be created automatically):
 ----------------------------------------------------
 ✗ Virtual environment (venv/) - Created by FIRST_TIME_SETUP.bat
 ✗ Database (db.sqlite3) - Created by FIRST_TIME_SETUP.bat
 ✗ Log files - Created automatically when server runs
-✗ Python itself - Must be installed separately
+✗ Python itself - Optional (can bundle WinPython or install separately)
 
 ================================================================================
                               QUICK START
@@ -50,22 +56,26 @@ After extracting, open and read in this order:
 
 STEP 3: SETUP PYTHON (If needed)
 ---------------------------------
-IMPORTANT: Python 3.11 or 3.12 (64-bit) required for bundled packages!
+You have THREE options (choose one):
 
-Option A: Install Python normally
-  - Download Python 3.11 or 3.12 from https://www.python.org/downloads/
+Option A: Bundle WinPython (ZERO DEPENDENCIES - Recommended for deployment)
+  - Download Winpython64-3.12.10.1dot.exe (23 MB) from:
+    https://github.com/winpython/winpython/releases
+  - Place in portable_python/ folder
+  - No Python installation required
+  - Works completely offline
+  - No admin rights needed
+  - See portable_python/README.txt for details
+
+Option B: Install Python normally (If already installed or prefer standard install)
+  - Download Python 3.10-3.13 (64-bit) from https://www.python.org/downloads/
   - Check "Add Python to PATH" during installation
-  - Must be 64-bit version for offline installation
+  - Works offline with bundled wheels
 
-Option B: Use portable Python
-  - Use portable Python 3.11 or 3.12 (64-bit)
+Option C: Use existing portable Python (If you already have one)
   - Edit PYTHON_PATH.txt to point to your portable python.exe
   - See HOW_TO_USE.txt for detailed instructions
-
-Option C: Different Python version (requires internet)
-  - If you have Python 3.10 or other versions
-  - Setup will download packages from internet (PyPI)
-  - Pre-built wheels won't work, but online install will
+  - Works offline with bundled wheels
 
 STEP 4: RUN FIRST TIME SETUP
 -----------------------------
@@ -112,20 +122,29 @@ requirements.txt - Python package dependencies
 requirements-postgres.txt - Optional PostgreSQL support
 .gitignore - Git ignore rules
 
-PRE-BUILT PACKAGES (wheels/ folder - 56 MB):
---------------------------------------------
+PRE-BUILT PACKAGES (wheels/ folder - 108 MB):
+---------------------------------------------
 Pre-compiled Python packages for offline installation
 ✓ Works without internet connection
 ✓ No C++ build tools required
-✓ Python 3.11 & 3.12 (64-bit Windows)
+✓ Python 3.10, 3.11, 3.12, 3.13 (64-bit Windows)
 
-Includes wheels for:
-  - numpy-2.3.3 (cp311 & cp312)
-  - pandas-2.3.3 (cp311 & cp312)
-  - Django-5.2.7
-  - openpyxl-3.1.5
-  - python-decouple-3.8
-  - All other dependencies (12 packages total)
+Includes wheels for (22 files total):
+  - numpy-2.2.6 (cp310, cp311, cp312, cp313)
+  - pandas-2.2.3 (cp310, cp311, cp312, cp313)
+  - psycopg2-binary-2.9.10 (cp310, cp311, cp312, cp313) - PostgreSQL support
+  - Django-5.2.7 (universal)
+  - openpyxl-3.1.5 (universal)
+  - python-decouple-3.8 (universal)
+  - All other dependencies (10 universal wheels)
+
+PORTABLE PYTHON FOLDER (portable_python/):
+------------------------------------------
+Ready for WinPython bundle (optional)
+✓ Add Winpython64-3.12.10.1dot.exe (~23 MB) for complete portability
+✓ See portable_python/README.txt for download instructions
+✓ Makes package 100% self-contained with zero dependencies
+✓ Automatically detected and extracted by setup script
 
 APPLICATION FILES:
 -----------------
@@ -162,12 +181,17 @@ Check list Orientation Blank - Copy.xlsx - Backup template
 SERVER COMPUTER (Running START_SERVER.bat):
 -------------------------------------------
 ✓ Windows 7 or higher
-✓ Python 3.11 or 3.12 (64-bit) - For offline installation
-  OR Python 3.10+ with internet connection
-✓ 600 MB free disk space (includes 56 MB wheels)
-✓ Network connection (for team access)
+✓ Python 3.10-3.13 (64-bit) - For offline installation with bundled wheels
+  OR use bundled WinPython (no Python installation required)
+  OR any Python 3.10+ with internet connection
+✓ 750 MB free disk space
+  - 108 MB wheels
+  - ~23 MB WinPython (if bundled)
+  - ~600 MB for venv and application
+✓ Network connection (for team access, not required for setup if using wheels)
 ✓ Port 8000 available
-✓ No C++ build tools required (with bundled wheels)
+✓ No C++ build tools required
+✓ No admin rights required (with WinPython)
 
 CLIENT COMPUTERS (Accessing via browser):
 -----------------------------------------
@@ -238,6 +262,98 @@ All documentation is included in this package:
   - QUICKSTART.md - For technical users
   - README.md - Complete technical reference
   - CLAUDE.md - Architecture and development guide
+  - RELEASE.md - Guide for publishing updates (for maintainers)
+
+================================================================================
+                        UPDATING THE APPLICATION
+================================================================================
+
+This application supports easy updates while preserving your data!
+
+GitHub Repository: https://github.com/Teagan-Brohman/traineeDatabase
+
+UPDATE METHODS:
+--------------
+
+Method 1: Git-Based Updates (Recommended for technical users)
+  Script: UPDATE_FROM_GITHUB.bat
+  Requirements: Git installed
+  How it works:
+    - Pulls latest code from GitHub automatically
+    - Backs up database and settings before updating
+    - Updates dependencies and runs migrations
+    - Fast and convenient
+
+Method 2: ZIP File Updates (For non-technical users)
+  Script: UPDATE_FROM_ZIP.bat
+  Requirements: Downloaded update ZIP file
+  How it works:
+    - Extracts update files from ZIP
+    - Backs up database and settings before updating
+    - Updates dependencies and runs migrations
+    - No Git knowledge required
+
+WHAT GETS PRESERVED:
+-------------------
+✓ Database (db.sqlite3) - All your trainee data
+✓ Settings (.env) - Your configuration
+✓ Logs - Application logs
+✓ Backups - Previous backups
+
+WHAT GETS UPDATED:
+-----------------
+✓ Application code - Bug fixes and new features
+✓ Templates - UI improvements
+✓ Dependencies - Package updates
+✓ Database schema - Automatic migrations
+✓ Documentation - Updated guides
+
+BACKUP STRATEGY:
+---------------
+Both update scripts automatically create timestamped backups:
+  Location: backups/backup_YYYYMMDD_HHMMSS/
+  Contents: db.sqlite3, .env
+
+To restore from backup:
+  1. Navigate to backups/ folder
+  2. Find the backup you want (sorted by date/time)
+  3. Copy db.sqlite3 back to application folder
+  4. Copy .env if settings were changed
+  5. Restart server
+
+VERSION TRACKING:
+----------------
+Check current version: Open version.txt file
+Latest version: https://github.com/Teagan-Brohman/traineeDatabase/releases/latest
+
+TROUBLESHOOTING UPDATES:
+-----------------------
+
+Issue: "Git not found" error
+Fix: Install Git from https://git-scm.com/download/win
+     OR use UPDATE_FROM_ZIP.bat instead
+
+Issue: "Authentication failed" during Git update
+Fix: Set up GitHub credentials or use UPDATE_FROM_ZIP.bat
+
+Issue: Merge conflicts during Git update
+Fix: User has local changes. Backup changes, delete .git folder,
+     re-run UPDATE_FROM_GITHUB.bat for fresh start
+
+Issue: Update completed but changes not visible
+Fix: 1. Restart the server (START_SERVER.bat)
+     2. Clear browser cache (Ctrl+F5)
+
+Issue: Database migration fails
+Fix: 1. Check backups/ folder for backup
+     2. Restore backup if needed
+     3. Report issue on GitHub
+
+FOR MAINTAINERS:
+---------------
+Publishing updates: See RELEASE.md for complete release process
+Creating releases: Use GitHub Releases with version tags (v1.0.0, v1.1.0, etc.)
+Update checklist: See RELEASE.md pre-release checklist
 
 ================================================================================
                             VERSION HISTORY

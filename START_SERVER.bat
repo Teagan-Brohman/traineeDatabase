@@ -13,21 +13,30 @@ echo    TRAINEE BADGE TRACKER - Starting Server
 echo ===============================================
 echo.
 
-REM Check for custom Python path configuration
-if exist "PYTHON_PATH.txt" (
-    echo [INFO] Checking for custom Python path...
-    for /f "tokens=2 delims==" %%a in ('findstr /v "^REM" PYTHON_PATH.txt ^| findstr "PYTHON_PATH"') do (
-        set "PYTHON_CMD=%%a"
-        set "PYTHON_CMD=!PYTHON_CMD: =!"
-    )
+REM Check for bundled WinPython (highest priority)
+set "PYTHON_CMD=python"
+set "WINPYTHON_DETECTED=0"
 
-    if defined PYTHON_CMD (
-        echo [INFO] Using custom Python: !PYTHON_CMD!
-    ) else (
-        set "PYTHON_CMD=python"
+if exist "portable_python\" (
+    REM Check if WinPython is already extracted
+    if exist "portable_python\WPy64-312101\python\python.exe" (
+        set "PYTHON_CMD=portable_python\WPy64-312101\python\python.exe"
+        set "WINPYTHON_DETECTED=1"
+        echo [INFO] Using portable WinPython 3.12.10
     )
-) else (
-    set "PYTHON_CMD=python"
+)
+
+REM Check for custom Python path configuration (if WinPython not found)
+if "%WINPYTHON_DETECTED%"=="0" (
+    if exist "PYTHON_PATH.txt" (
+        echo [INFO] Checking for custom Python path...
+        for /f "usebackq tokens=2* delims==" %%a in (`findstr /v "^REM" PYTHON_PATH.txt ^| findstr "PYTHON_PATH"`) do (
+            set "PYTHON_CMD=%%a"
+        )
+        if not "%PYTHON_CMD%"=="python" (
+            echo [INFO] Using custom Python from PYTHON_PATH.txt
+        )
+    )
 )
 
 REM Check if Python is available
@@ -35,8 +44,7 @@ REM Check if Python is available
 if errorlevel 1 (
     echo ERROR: Python is not installed or not found at: %PYTHON_CMD%
     echo.
-    echo Please install Python 3.8+ or edit PYTHON_PATH.txt
-    echo with your portable Python installation path
+    echo Please run FIRST_TIME_SETUP.bat first or install Python
     echo.
     pause
     exit /b 1
@@ -62,7 +70,7 @@ echo [3/5] Running database migrations...
 python manage.py migrate --noinput
 
 echo [4/5] Checking for admin user...
-python -c "import django; django.setup(); from django.contrib.auth.models import User; print('Admin exists' if User.objects.filter(is_superuser=True).exists() else 'No admin found')"
+python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trainee_tracker.settings'); import django; django.setup(); from django.contrib.auth.models import User; print('Admin exists' if User.objects.filter(is_superuser=True).exists() else 'No admin found')"
 
 echo [5/5] Starting server...
 echo.

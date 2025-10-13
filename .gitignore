@@ -32,3 +32,20 @@ Thumbs.db
 # Temporary files
 ~$*.xlsx
 logs/
+backups/
+temp_update/
+
+# Deployment artifacts
+traineeDatabase_DEPLOYMENT.zip
+traineeDatabase_DEPLOYMENT_correction/
+*.zip
+
+# Portable Python (extracted)
+portable_python/WPy*
+portable_python/Winpython64*.exe
+
+# Keep portable_python/README.txt in repo
+!portable_python/README.txt
+
+# Include wheels folder (pre-built packages for offline installation)
+# This is intentionally NOT ignored - wheels should be in the repository

@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django import forms
+from django.db import models
 from .models import Trainee, Task, SignOff, StaffProfile, UnsignLog, Cohort
 
 class SignOffInline(admin.TabularInline):

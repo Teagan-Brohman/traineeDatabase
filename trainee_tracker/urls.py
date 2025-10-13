@@ -15,11 +15,17 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.contrib.auth import logout
 from django.urls import path, include
 from django.shortcuts import redirect
+
+def logout_view(request):
+    logout(request)
+    return redirect('/admin/login/')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('tracker/', include('tracker.urls')),
+    path('logout/', logout_view, name='logout'),
     path('', lambda request: redirect('trainee_list')),
 ]
