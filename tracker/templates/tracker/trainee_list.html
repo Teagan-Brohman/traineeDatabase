@@ -53,10 +53,22 @@
     </div>
 </div>
 
+<!-- Bulk Operations Toolbar -->
+<div id="bulkToolbar" class="bulk-toolbar" style="display: none;">
+    <div class="bulk-toolbar-content">
+        <span id="selectedCount" class="bulk-selected-count">0 trainees selected</span>
+        <button id="bulkSignOffBtn" class="btn btn-primary">Bulk Sign-Off</button>
+        <button id="clearSelectionBtn" class="btn">Clear Selection</button>
+    </div>
+</div>
+
 <div class="{% if view_mode == 'compact' %}compact-view{% elif view_mode == 'detailed' %}detailed-view{% endif %}">
     <table id="traineeTable">
         <thead>
             <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" id="selectAllTrainees" title="Select all trainees">
+                </th>
                 <th>Badge Number</th>
                 <th>Name</th>
                 <th>Cohort</th>
@@ -71,7 +83,11 @@
             <tr class="trainee-row"
                 data-badge="{{ trainee.badge_number|lower }}"
                 data-name="{{ trainee.full_name|lower }}"
-                data-cohort="{{ trainee.cohort|lower }}">
+                data-cohort="{{ trainee.cohort|lower }}"
+                data-trainee-id="{{ trainee.id }}">
+                <td>
+                    <input type="checkbox" class="trainee-checkbox" data-trainee-id="{{ trainee.id }}" data-trainee-name="{{ trainee.full_name }}" data-badge="{{ trainee.badge_number }}">
+                </td>
                 <td>{{ trainee.badge_number }}</td>
                 <td>{{ trainee.full_name }}</td>
                 <td>{{ trainee.cohort }}</td>
@@ -90,7 +106,7 @@
             </tr>
             {% empty %}
             <tr id="noTraineesRow">
-                <td colspan="7" style="text-align: center;">No active trainees found. Add trainees in the admin panel.</td>
+                <td colspan="8" style="text-align: center;">No active trainees found. Add trainees in the admin panel.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -167,5 +183,240 @@ searchInput.addEventListener('keydown', function(e) {
         clearSearch();
     }
 });
+
+// ========================================
+// BULK OPERATIONS FUNCTIONALITY
+// ========================================
+
+const bulkToolbar = document.getElementById('bulkToolbar');
+const selectedCountSpan = document.getElementById('selectedCount');
+const bulkSignOffBtn = document.getElementById('bulkSignOffBtn');
+const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+const selectAllCheckbox = document.getElementById('selectAllTrainees');
+const traineeCheckboxes = document.querySelectorAll('.trainee-checkbox');
+
+// Track selected trainees
+let selectedTrainees = new Set();
+
+// Update UI when selection changes
+function updateBulkUI() {
+    const count = selectedTrainees.size;
+
+    if (count > 0) {
+        bulkToolbar.style.display = 'block';
+        selectedCountSpan.textContent = `${count} trainee${count !== 1 ? 's' : ''} selected`;
+    } else {
+        bulkToolbar.style.display = 'none';
+    }
+
+    // Update select all checkbox state
+    const visibleCheckboxes = Array.from(traineeCheckboxes).filter(cb => cb.closest('.trainee-row').style.display !== 'none');
+    const allSelected = visibleCheckboxes.length > 0 && visibleCheckboxes.every(cb => cb.checked);
+    selectAllCheckbox.checked = allSelected;
+}
+
+// Handle individual checkbox changes
+traineeCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const traineeId = this.dataset.traineeId;
+        const traineeName = this.dataset.traineeName;
+        const badge = this.dataset.badge;
+
+        if (this.checked) {
+            selectedTrainees.add({id: traineeId, name: traineeName, badge: badge});
+        } else {
+            selectedTrainees = new Set(Array.from(selectedTrainees).filter(t => t.id !== traineeId));
+        }
+
+        updateBulkUI();
+    });
+});
+
+// Handle select all checkbox
+selectAllCheckbox.addEventListener('change', function() {
+    const visibleCheckboxes = Array.from(traineeCheckboxes).filter(cb => cb.closest('.trainee-row').style.display !== 'none');
+
+    if (this.checked) {
+        visibleCheckboxes.forEach(checkbox => {
+            checkbox.checked = true;
+            const traineeId = checkbox.dataset.traineeId;
+            const traineeName = checkbox.dataset.traineeName;
+            const badge = checkbox.dataset.badge;
+            selectedTrainees.add({id: traineeId, name: traineeName, badge: badge});
+        });
+    } else {
+        visibleCheckboxes.forEach(checkbox => {
+            checkbox.checked = false;
+            const traineeId = checkbox.dataset.traineeId;
+            selectedTrainees = new Set(Array.from(selectedTrainees).filter(t => t.id !== traineeId));
+        });
+    }
+
+    updateBulkUI();
+});
+
+// Clear selection
+clearSelectionBtn.addEventListener('click', function() {
+    traineeCheckboxes.forEach(cb => cb.checked = false);
+    selectedTrainees.clear();
+    updateBulkUI();
+});
+
+// Show bulk sign-off modal
+bulkSignOffBtn.addEventListener('click', function() {
+    if (selectedTrainees.size === 0) {
+        alert('Please select at least one trainee.');
+        return;
+    }
+
+    // Open modal
+    showBulkSignOffModal();
+});
+
+// Bulk Sign-Off Modal
+function showBulkSignOffModal() {
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content bulk-modal">
+            <h2>Bulk Sign-Off</h2>
+            <p><strong>${selectedTrainees.size} trainee${selectedTrainees.size !== 1 ? 's' : ''} selected:</strong></p>
+            <div class="selected-trainees-list">
+                ${Array.from(selectedTrainees).map(t => `<div>${t.badge} - ${t.name}</div>`).join('')}
+            </div>
+
+            <div class="form-group">
+                <label for="bulkTaskSelect">Select Task to Sign Off:</label>
+                <select id="bulkTaskSelect" class="form-control" required>
+                    <option value="">-- Select a task --</option>
+                    {% for task in tasks %}
+                    <option value="{{ task.id }}" data-requires-score="{{ task.requires_score }}" data-min-score="{{ task.minimum_score|default:'' }}">
+                        {{ task.order }}. {{ task.name }}{% if task.requires_score %} (Score Required){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="bulkScoreGroup" style="display: none;">
+                <label for="bulkScoreInput">Score (applies to all trainees):</label>
+                <input type="text" id="bulkScoreInput" class="form-control" placeholder="e.g., 95">
+                <small id="bulkMinScoreNote" class="form-text"></small>
+            </div>
+
+            <div class="form-group">
+                <label for="bulkNotesInput">Notes (optional):</label>
+                <textarea id="bulkNotesInput" class="form-control" rows="3" placeholder="Enter any notes..."></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button id="confirmBulkSignOff" class="btn btn-primary">Sign Off ${selectedTrainees.size} Trainee${selectedTrainees.size !== 1 ? 's' : ''}</button>
+                <button id="cancelBulkSignOff" class="btn">Cancel</button>
+            </div>
+
+            <div id="bulkProgress" class="bulk-progress" style="display: none;">
+                <div class="progress-spinner"></div>
+                <p>Processing sign-offs...</p>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Handle task selection
+    const taskSelect = document.getElementById('bulkTaskSelect');
+    const scoreGroup = document.getElementById('bulkScoreGroup');
+    const scoreInput = document.getElementById('bulkScoreInput');
+    const minScoreNote = document.getElementById('bulkMinScoreNote');
+
+    taskSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const requiresScore = selectedOption.dataset.requiresScore === 'True';
+        const minScore = selectedOption.dataset.minScore;
+
+        if (requiresScore) {
+            scoreGroup.style.display = 'block';
+            scoreInput.required = true;
+            if (minScore) {
+                minScoreNote.textContent = `Minimum passing score: ${minScore}`;
+            }
+        } else {
+            scoreGroup.style.display = 'none';
+            scoreInput.required = false;
+            minScoreNote.textContent = '';
+        }
+    });
+
+    // Handle confirmation
+    document.getElementById('confirmBulkSignOff').addEventListener('click', async function() {
+        const taskId = taskSelect.value;
+        const score = scoreInput.value.trim();
+        const notes = document.getElementById('bulkNotesInput').value.trim();
+
+        if (!taskId) {
+            alert('Please select a task.');
+            return;
+        }
+
+        const selectedOption = taskSelect.options[taskSelect.selectedIndex];
+        const requiresScore = selectedOption.dataset.requiresScore === 'True';
+
+        if (requiresScore && !score) {
+            alert('This task requires a score.');
+            return;
+        }
+
+        // Show progress
+        document.getElementById('bulkProgress').style.display = 'block';
+        this.disabled = true;
+
+        // Prepare data
+        const data = {
+            trainee_ids: Array.from(selectedTrainees).map(t => parseInt(t.id)),
+            task_ids: [parseInt(taskId)],
+            scores: score ? {[taskId]: score} : {},
+            notes: notes
+        };
+
+        try {
+            const response = await fetch('{% url "bulk_sign_off" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert(`Success!\n\nCreated: ${result.created}\nUpdated: ${result.updated}\n${result.skipped.length > 0 ? `Skipped: ${result.skipped.length}` : ''}`);
+                document.body.removeChild(modal);
+                location.reload(); // Reload to show updated progress
+            } else {
+                alert(`Error: ${result.error}\n\n${result.errors.map(e => `${e.trainee} - ${e.task}: ${e.error}`).join('\n')}`);
+                document.getElementById('bulkProgress').style.display = 'none';
+                this.disabled = false;
+            }
+        } catch (error) {
+            alert('An error occurred while processing bulk sign-off: ' + error.message);
+            document.getElementById('bulkProgress').style.display = 'none';
+            this.disabled = false;
+        }
+    });
+
+    // Handle cancel
+    document.getElementById('cancelBulkSignOff').addEventListener('click', function() {
+        document.body.removeChild(modal);
+    });
+
+    // Close on overlay click
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    });
+}
 </script>
 {% endblock %}

@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 from datetime import date, timedelta
 from decimal import Decimal
+import json
 
 from .models import Trainee, Task, SignOff, StaffProfile, UnsignLog, Cohort
 
@@ -440,3 +441,340 @@ class ArchiveViewTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.trainee_2024.badge_number)
+
+
+class BulkSignOffTestCase(TestCase):
+    """Test bulk sign-off functionality"""
+
+    def setUp(self):
+        """Set up test data"""
+        # Create cohort
+        self.cohort = Cohort.objects.create(name="Fall 2025", year=2025, semester="Fall")
+
+        # Create staff users
+        self.staff_user = User.objects.create_user(
+            username='staff',
+            password='password',
+            first_name='Staff',
+            last_name='User',
+            is_staff=True
+        )
+
+        self.other_staff = User.objects.create_user(
+            username='other_staff',
+            password='password',
+            first_name='Other',
+            last_name='Staff',
+            is_staff=True
+        )
+
+        # Create trainees
+        self.trainee1 = Trainee.objects.create(
+            badge_number='#2501',
+            first_name='Alice',
+            last_name='Smith',
+            cohort=self.cohort
+        )
+
+        self.trainee2 = Trainee.objects.create(
+            badge_number='#2502',
+            first_name='Bob',
+            last_name='Jones',
+            cohort=self.cohort
+        )
+
+        self.trainee3 = Trainee.objects.create(
+            badge_number='#2503',
+            first_name='Charlie',
+            last_name='Brown',
+            cohort=self.cohort
+        )
+
+        # Create tasks
+        self.task1 = Task.objects.create(
+            order=1,
+            name='Onboarding',
+            description='Complete onboarding',
+            requires_score=False
+        )
+
+        self.task2 = Task.objects.create(
+            order=2,
+            name='Quiz 1',
+            description='First quiz',
+            requires_score=True,
+            minimum_score=80
+        )
+
+        self.task3 = Task.objects.create(
+            order=3,
+            name='Safety Training',
+            description='Safety course',
+            requires_score=False
+        )
+
+        self.task4 = Task.objects.create(
+            order=4,
+            name='SOP Training',
+            description='Standard procedures',
+            requires_score=False
+        )
+
+        # Task with restricted signers
+        self.restricted_task = Task.objects.create(
+            order=5,
+            name='Restricted Task',
+            description='Only certain staff can sign off',
+            requires_score=False
+        )
+        self.restricted_task.authorized_signers.add(self.other_staff)
+
+    def test_bulk_signoff_multiple_trainees_one_task(self):
+        """Test signing off multiple trainees on one task"""
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [self.trainee1.id, self.trainee2.id, self.trainee3.id],
+            'task_ids': [self.task1.id],
+            'scores': {},
+            'notes': 'Completed together'
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result['success'])
+        self.assertEqual(result['created'], 3)
+        self.assertEqual(result['updated'], 0)
+
+        # Verify signoffs were created
+        self.assertEqual(SignOff.objects.filter(task=self.task1).count(), 3)
+
+    def test_bulk_signoff_one_trainee_multiple_tasks(self):
+        """Test signing off one trainee on multiple tasks"""
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [self.trainee1.id],
+            'task_ids': [self.task1.id, self.task3.id, self.task4.id],
+            'scores': {},
+            'notes': 'Caught up on multiple tasks'
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result['success'])
+        self.assertEqual(result['created'], 3)
+
+        # Verify signoffs for trainee1
+        self.assertEqual(
+            SignOff.objects.filter(trainee=self.trainee1).count(),
+            3
+        )
+
+    def test_bulk_signoff_with_scores(self):
+        """Test bulk sign-off with score requirements"""
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [self.trainee1.id, self.trainee2.id],
+            'task_ids': [self.task2.id],
+            'scores': {str(self.task2.id): '95'},
+            'notes': 'Both passed quiz'
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result['success'])
+        self.assertEqual(result['created'], 2)
+
+        # Verify scores were recorded
+        signoff1 = SignOff.objects.get(trainee=self.trainee1, task=self.task2)
+        signoff2 = SignOff.objects.get(trainee=self.trainee2, task=self.task2)
+        self.assertEqual(signoff1.score, '95')
+        self.assertEqual(signoff2.score, '95')
+
+    def test_bulk_signoff_missing_required_score(self):
+        """Test bulk sign-off fails when required score is missing"""
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [self.trainee1.id],
+            'task_ids': [self.task2.id],
+            'scores': {},  # Missing required score
+            'notes': ''
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertFalse(result['success'])
+        self.assertEqual(len(result['errors']), 1)
+        self.assertIn('Score required', result['errors'][0]['error'])
+
+        # Verify no signoff was created
+        self.assertEqual(SignOff.objects.filter(task=self.task2).count(), 0)
+
+    def test_bulk_signoff_score_below_minimum(self):
+        """Test bulk sign-off fails when score is below minimum"""
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [self.trainee1.id],
+            'task_ids': [self.task2.id],
+            'scores': {str(self.task2.id): '70'},  # Below minimum of 80
+            'notes': ''
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertFalse(result['success'])
+        self.assertEqual(len(result['errors']), 1)
+        self.assertIn('below minimum', result['errors'][0]['error'])
+
+        # Verify no signoff was created
+        self.assertEqual(SignOff.objects.filter(task=self.task2).count(), 0)
+
+    def test_bulk_signoff_unauthorized_task(self):
+        """Test bulk sign-off skips unauthorized tasks"""
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [self.trainee1.id],
+            'task_ids': [self.restricted_task.id],
+            'scores': {},
+            'notes': ''
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result['success'])
+        self.assertEqual(result['created'], 0)
+        self.assertEqual(len(result['skipped']), 1)
+        self.assertIn('Not authorized', result['skipped'][0]['reason'])
+
+        # Verify no signoff was created
+        self.assertEqual(SignOff.objects.filter(task=self.restricted_task).count(), 0)
+
+    def test_bulk_signoff_update_existing(self):
+        """Test bulk sign-off updates existing signoffs"""
+        # Create existing signoff
+        SignOff.objects.create(
+            trainee=self.trainee1,
+            task=self.task1,
+            signed_by=self.other_staff,
+            notes='Original notes'
+        )
+
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [self.trainee1.id],
+            'task_ids': [self.task1.id],
+            'scores': {},
+            'notes': 'Updated notes'
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result['success'])
+        self.assertEqual(result['created'], 0)
+        self.assertEqual(result['updated'], 1)
+
+        # Verify signoff was updated
+        signoff = SignOff.objects.get(trainee=self.trainee1, task=self.task1)
+        self.assertEqual(signoff.signed_by, self.staff_user)
+        self.assertEqual(signoff.notes, 'Updated notes')
+
+    def test_bulk_signoff_empty_selection(self):
+        """Test bulk sign-off fails with empty selection"""
+        self.client.login(username='staff', password='password')
+
+        data = {
+            'trainee_ids': [],
+            'task_ids': [],
+            'scores': {},
+            'notes': ''
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = response.json()
+        self.assertFalse(result['success'])
+
+    def test_bulk_signoff_requires_login(self):
+        """Test bulk sign-off requires authentication"""
+        data = {
+            'trainee_ids': [self.trainee1.id],
+            'task_ids': [self.task1.id],
+            'scores': {},
+            'notes': ''
+        }
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data=json.dumps(data),
+            content_type='application/json'
+        )
+
+        # Should redirect to login
+        self.assertEqual(response.status_code, 302)
+
+    def test_bulk_signoff_invalid_json(self):
+        """Test bulk sign-off handles invalid JSON"""
+        self.client.login(username='staff', password='password')
+
+        response = self.client.post(
+            reverse('bulk_sign_off'),
+            data='invalid json',
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        result = response.json()
+        self.assertFalse(result['success'])

@@ -154,6 +154,35 @@ SIGN OFF A TASK:
 4. Enter score if required
 5. Click "Submit"
 
+BULK SIGN-OFF OPERATIONS:
+-------------------------
+Save time by signing off multiple trainees or tasks at once!
+
+Option A: Sign off MULTIPLE TRAINEES on ONE TASK
+1. Go to trainee list page
+2. Check the boxes next to the trainees you want to select
+   - Or use "Select All" checkbox in the header to select everyone
+3. Click "Bulk Sign-Off" button
+4. Select the task from the dropdown
+5. Enter score if the task requires it (applies to all trainees)
+6. Add notes (optional)
+7. Click confirmation button
+
+Option B: Sign off ONE TRAINEE on MULTIPLE TASKS
+1. Click on a trainee's badge number to open their detail page
+2. Check the boxes next to the tasks you want to sign off
+   - Only unsigned tasks you're authorized for will have checkboxes
+3. Click "Bulk Sign-Off Selected Tasks" button
+4. Enter scores for any tasks that require them
+5. Add notes (optional)
+6. Click confirmation button
+
+Notes:
+- Bulk operations respect task authorization rules
+- Tasks requiring scores must have scores provided
+- The system will show a summary of what was completed
+- If any errors occur, NO changes are made (all-or-nothing)
+
 IMPORT TRAINEE DATA FROM EXCEL:
 ------------------------------
 1. Open Command Prompt in the application folder:

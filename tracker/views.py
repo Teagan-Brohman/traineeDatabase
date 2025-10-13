@@ -20,10 +20,14 @@ def trainee_list(request):
     else:
         trainees = Trainee.objects.filter(is_active=True).order_by('badge_number')
 
+    # Get all active tasks for bulk operations
+    tasks = Task.objects.filter(is_active=True).order_by('order')
+
     context = {
         'trainees': trainees,
         'view_mode': view_mode,
         'current_cohort': current_cohort,
+        'tasks': tasks,
     }
     return render(request, 'tracker/trainee_list.html', context)
 
@@ -376,11 +380,146 @@ def archive_detail(request, cohort_id):
     # Get trainees for this cohort
     trainees = Trainee.objects.filter(is_active=True, cohort=cohort).order_by('badge_number')
 
+    # Get all active tasks for bulk operations
+    tasks = Task.objects.filter(is_active=True).order_by('order')
+
     context = {
         'trainees': trainees,
         'view_mode': view_mode,
         'cohort': cohort,
         'current_cohort': current_cohort,
         'is_archive': True,
+        'tasks': tasks,
     }
     return render(request, 'tracker/trainee_list.html', context)
+
+
+@login_required
+def bulk_sign_off(request):
+    """
+    Bulk sign-off multiple trainees on one task, or one trainee on multiple tasks.
+
+    Expected POST data (JSON):
+    {
+        "trainee_ids": [1, 2, 3],  # Or single trainee for multi-task mode
+        "task_ids": [5],           # Or multiple tasks for single trainee mode
+        "scores": {"5": "95"},     # Task ID -> score mapping (if required)
+        "notes": "Completed together"
+    }
+
+    Returns JSON:
+    {
+        "success": true,
+        "created": 3,
+        "updated": 1,
+        "skipped": [{"trainee": "#2523", "task": "Quiz", "reason": "Already signed off"}],
+        "errors": []
+    }
+    """
+    from django.http import JsonResponse
+    from django.db import transaction
+    import json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    trainee_ids = data.get('trainee_ids', [])
+    task_ids = data.get('task_ids', [])
+    scores = data.get('scores', {})  # Dict of task_id -> score
+    notes = data.get('notes', '')
+
+    # Validation
+    if not trainee_ids or not task_ids:
+        return JsonResponse({'success': False, 'error': 'Must select at least one trainee and one task'}, status=400)
+
+    results = {
+        'success': True,
+        'created': 0,
+        'updated': 0,
+        'skipped': [],
+        'errors': []
+    }
+
+    try:
+        with transaction.atomic():
+            # Fetch trainees and tasks
+            trainees = Trainee.objects.filter(id__in=trainee_ids, is_active=True)
+            tasks = Task.objects.filter(id__in=task_ids, is_active=True).prefetch_related('authorized_signers')
+
+            if trainees.count() != len(trainee_ids):
+                return JsonResponse({'success': False, 'error': 'One or more trainees not found'}, status=404)
+
+            if tasks.count() != len(task_ids):
+                return JsonResponse({'success': False, 'error': 'One or more tasks not found'}, status=404)
+
+            # Process each combination
+            for trainee in trainees:
+                for task in tasks:
+                    # Check authorization
+                    if not task.can_user_sign_off(request.user):
+                        results['skipped'].append({
+                            'trainee': trainee.badge_number,
+                            'task': task.name,
+                            'reason': 'Not authorized to sign off this task'
+                        })
+                        continue
+
+                    # Validate score if required
+                    score = scores.get(str(task.id), '')
+                    if task.requires_score and task.minimum_score is not None:
+                        if not score:
+                            results['errors'].append({
+                                'trainee': trainee.badge_number,
+                                'task': task.name,
+                                'error': f'Score required (minimum: {task.minimum_score})'
+                            })
+                            continue
+
+                        try:
+                            score_value = float(score)
+                            if score_value < float(task.minimum_score):
+                                results['errors'].append({
+                                    'trainee': trainee.badge_number,
+                                    'task': task.name,
+                                    'error': f'Score {score} below minimum {task.minimum_score}'
+                                })
+                                continue
+                        except ValueError:
+                            results['errors'].append({
+                                'trainee': trainee.badge_number,
+                                'task': task.name,
+                                'error': 'Invalid score format'
+                            })
+                            continue
+
+                    # Create or update sign-off
+                    signoff, created = SignOff.objects.update_or_create(
+                        trainee=trainee,
+                        task=task,
+                        defaults={
+                            'signed_by': request.user,
+                            'score': score,
+                            'notes': notes
+                        }
+                    )
+
+                    if created:
+                        results['created'] += 1
+                    else:
+                        results['updated'] += 1
+
+            # If there were errors, rollback transaction
+            if results['errors']:
+                transaction.set_rollback(True)
+                results['success'] = False
+                results['error'] = f"{len(results['errors'])} validation errors occurred. No changes made."
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse(results)

@@ -157,3 +157,90 @@ The system expects Excel files structured as:
 - Column B: Name in "Last, First" format
 
 To import new cohorts, place Excel file in project root and modify `import_data.py` filename reference.
+
+## Bulk Operations Feature
+
+### Overview
+Bulk operations allow staff to sign off multiple trainees on one task, or one trainee on multiple tasks simultaneously.
+
+### Backend Implementation
+
+**View**: `tracker/views.py:bulk_sign_off()`
+- Accepts JSON POST requests
+- Validates user authorization for each task
+- Validates scores if required
+- Uses database transactions for atomic operations
+- Returns JSON response with success/error details
+
+**Request Format**:
+```python
+{
+    "trainee_ids": [1, 2, 3],  # List of trainee IDs
+    "task_ids": [5],           # List of task IDs
+    "scores": {"5": "95"},     # Dict of task_id -> score
+    "notes": "Bulk completion"
+}
+```
+
+**Response Format**:
+```python
+{
+    "success": true,
+    "created": 3,              # New signoffs created
+    "updated": 1,              # Existing signoffs updated
+    "skipped": [               # Items skipped (with reason)
+        {"trainee": "#2523", "task": "Quiz", "reason": "Not authorized"}
+    ],
+    "errors": []               # Validation errors (causes rollback)
+}
+```
+
+### Frontend Implementation
+
+**Trainee List** (`tracker/templates/tracker/trainee_list.html`):
+- Checkbox column for selecting trainees
+- Bulk toolbar appears when selections made
+- Modal shows selected trainees and task dropdown
+- JavaScript handles selection state and AJAX submission
+- Uses `tasks` context variable for task dropdown
+
+**Trainee Detail** (`tracker/templates/tracker/trainee_detail.html`):
+- Checkboxes for unsigned, authorized tasks
+- Bulk toolbar for multi-task signoff
+- Modal with individual score inputs for tasks requiring scores
+- JavaScript manages task selection and validation
+
+**Styling** (`tracker/templates/tracker/base.html`):
+- `.bulk-toolbar` - Floating action bar
+- `.modal-overlay` - Full-screen modal backdrop
+- `.bulk-modal` - Wide modal for bulk operations
+- `.progress-spinner` - Loading indicator
+
+### Key Design Decisions
+
+1. **Two Use Cases**:
+   - **Many trainees, one task**: Common for cohort-wide completions (e.g., orientation)
+   - **One trainee, many tasks**: Catching up individual trainees
+
+2. **Authorization**: Every task is validated against `Task.can_user_sign_off()` before processing
+
+3. **Score Handling**:
+   - Multi-trainee mode: Single score applies to all
+   - Multi-task mode: Individual score inputs for each task requiring scores
+
+4. **Atomic Operations**: All signoffs in a request succeed or all fail (transaction.atomic)
+
+5. **User Feedback**: Shows counts of created/updated/skipped, with detailed error messages
+
+### Testing
+Comprehensive test suite in `tracker/tests.py:BulkSignOffTestCase`:
+- Multiple trainees, single task
+- Single trainee, multiple tasks
+- Score validation (required, minimum)
+- Authorization enforcement
+- Update existing signoffs
+- Empty selections
+- Authentication requirements
+- Invalid JSON handling
+
+See tests for examples of expected behavior and edge cases.
