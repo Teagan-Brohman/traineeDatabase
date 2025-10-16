@@ -220,227 +220,235 @@ document.getElementById('unsignModal').addEventListener('click', function(e) {
 // BULK OPERATIONS FOR TRAINEE DETAIL
 // ========================================
 
-const bulkToolbarDetail = document.getElementById('bulkToolbarDetail');
-const selectedTaskCountSpan = document.getElementById('selectedTaskCount');
-const bulkSignOffTasksBtn = document.getElementById('bulkSignOffTasksBtn');
-const clearTaskSelectionBtn = document.getElementById('clearTaskSelectionBtn');
-const selectAllTasksCheckbox = document.getElementById('selectAllTasks');
-const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+document.addEventListener('DOMContentLoaded', function() {
+    const bulkToolbarDetail = document.getElementById('bulkToolbarDetail');
+    const selectedTaskCountSpan = document.getElementById('selectedTaskCount');
+    const bulkSignOffTasksBtn = document.getElementById('bulkSignOffTasksBtn');
+    const clearTaskSelectionBtn = document.getElementById('clearTaskSelectionBtn');
+    const selectAllTasksCheckbox = document.getElementById('selectAllTasks');
+    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
 
-// Track selected tasks (Map: taskId -> task data)
-let selectedTasks = new Map();
-
-// Update UI when task selection changes
-function updateBulkTaskUI() {
-    const count = selectedTasks.size;
-
-    if (count > 0) {
-        bulkToolbarDetail.style.display = 'block';
-        selectedTaskCountSpan.textContent = `${count} task${count !== 1 ? 's' : ''} selected`;
-    } else {
-        bulkToolbarDetail.style.display = 'none';
+    // Safety checks - exit if critical elements don't exist
+    if (!bulkToolbarDetail || !selectAllTasksCheckbox) {
+        console.warn('Bulk operations elements not found');
+        return;
     }
 
-    // Update select all checkbox state
-    const allSelected = taskCheckboxes.length > 0 && Array.from(taskCheckboxes).every(cb => cb.checked);
-    selectAllTasksCheckbox.checked = allSelected;
-}
+    // Track selected tasks (Map: taskId -> task data)
+    let selectedTasks = new Map();
 
-// Handle individual task checkbox changes
-taskCheckboxes.forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        const taskId = this.dataset.taskId;
-        const taskName = this.dataset.taskName;
-        const requiresScore = this.dataset.requiresScore === 'True';
-        const minScore = this.dataset.minScore;
+    // Update UI when task selection changes
+    function updateBulkTaskUI() {
+        const count = selectedTasks.size;
 
-        if (this.checked) {
-            selectedTasks.set(taskId, {id: taskId, name: taskName, requiresScore: requiresScore, minScore: minScore});
+        if (count > 0) {
+            bulkToolbarDetail.style.display = 'block';
+            selectedTaskCountSpan.textContent = `${count} task${count !== 1 ? 's' : ''} selected`;
         } else {
-            selectedTasks.delete(taskId);
+            bulkToolbarDetail.style.display = 'none';
+        }
+
+        // Update select all checkbox state
+        const allSelected = taskCheckboxes.length > 0 && Array.from(taskCheckboxes).every(cb => cb.checked);
+        selectAllTasksCheckbox.checked = allSelected;
+    }
+
+    // Handle individual task checkbox changes
+    taskCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const taskId = this.dataset.taskId;
+            const taskName = this.dataset.taskName;
+            const requiresScore = this.dataset.requiresScore === 'True';
+            const minScore = this.dataset.minScore;
+
+            if (this.checked) {
+                selectedTasks.set(taskId, {id: taskId, name: taskName, requiresScore: requiresScore, minScore: minScore});
+            } else {
+                selectedTasks.delete(taskId);
+            }
+
+            updateBulkTaskUI();
+        });
+    });
+
+    // Handle select all tasks checkbox
+    selectAllTasksCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            taskCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                const taskId = checkbox.dataset.taskId;
+                const taskName = checkbox.dataset.taskName;
+                const requiresScore = checkbox.dataset.requiresScore === 'True';
+                const minScore = checkbox.dataset.minScore;
+                selectedTasks.set(taskId, {id: taskId, name: taskName, requiresScore: requiresScore, minScore: minScore});
+            });
+        } else {
+            taskCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            selectedTasks.clear();
         }
 
         updateBulkTaskUI();
     });
-});
 
-// Handle select all tasks checkbox
-selectAllTasksCheckbox.addEventListener('change', function() {
-    if (this.checked) {
-        taskCheckboxes.forEach(checkbox => {
-            checkbox.checked = true;
-            const taskId = checkbox.dataset.taskId;
-            const taskName = checkbox.dataset.taskName;
-            const requiresScore = checkbox.dataset.requiresScore === 'True';
-            const minScore = checkbox.dataset.minScore;
-            selectedTasks.set(taskId, {id: taskId, name: taskName, requiresScore: requiresScore, minScore: minScore});
-        });
-    } else {
-        taskCheckboxes.forEach(checkbox => {
-            checkbox.checked = false;
-        });
+    // Clear task selection
+    clearTaskSelectionBtn.addEventListener('click', function() {
+        taskCheckboxes.forEach(cb => cb.checked = false);
         selectedTasks.clear();
-    }
+        updateBulkTaskUI();
+    });
 
-    updateBulkTaskUI();
-});
+    // Show bulk task sign-off modal
+    bulkSignOffTasksBtn.addEventListener('click', function() {
+        if (selectedTasks.size === 0) {
+            alert('Please select at least one task.');
+            return;
+        }
 
-// Clear task selection
-clearTaskSelectionBtn.addEventListener('click', function() {
-    taskCheckboxes.forEach(cb => cb.checked = false);
-    selectedTasks.clear();
-    updateBulkTaskUI();
-});
+        showBulkTaskSignOffModal();
+    });
 
-// Show bulk task sign-off modal
-bulkSignOffTasksBtn.addEventListener('click', function() {
-    if (selectedTasks.size === 0) {
-        alert('Please select at least one task.');
-        return;
-    }
+    // Bulk Task Sign-Off Modal
+    function showBulkTaskSignOffModal() {
+        const tasksArray = Array.from(selectedTasks.values());
+        const hasScoreRequirements = tasksArray.some(t => t.requiresScore);
 
-    showBulkTaskSignOffModal();
-});
+        // Create score inputs for tasks that require scores
+        let scoreInputsHTML = '';
+        if (hasScoreRequirements) {
+            scoreInputsHTML = '<div class="form-group"><strong>Scores Required:</strong></div>';
+            tasksArray.filter(t => t.requiresScore).forEach(task => {
+                scoreInputsHTML += `
+                    <div class="form-group">
+                        <label for="score_${task.id}">${task.name}:${task.minScore ? ` (min: ${task.minScore})` : ''}</label>
+                        <input type="text" id="score_${task.id}" class="form-control score-input"
+                               data-task-id="${task.id}" placeholder="e.g., 95" required>
+                    </div>
+                `;
+            });
+        }
 
-// Bulk Task Sign-Off Modal
-function showBulkTaskSignOffModal() {
-    const tasksArray = Array.from(selectedTasks.values());
-    const hasScoreRequirements = tasksArray.some(t => t.requiresScore);
-
-    // Create score inputs for tasks that require scores
-    let scoreInputsHTML = '';
-    if (hasScoreRequirements) {
-        scoreInputsHTML = '<div class="form-group"><strong>Scores Required:</strong></div>';
-        tasksArray.filter(t => t.requiresScore).forEach(task => {
-            scoreInputsHTML += `
-                <div class="form-group">
-                    <label for="score_${task.id}">${task.name}:${task.minScore ? ` (min: ${task.minScore})` : ''}</label>
-                    <input type="text" id="score_${task.id}" class="form-control score-input"
-                           data-task-id="${task.id}" placeholder="e.g., 95" required>
+        // Create modal overlay
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content bulk-modal">
+                <h2>Bulk Sign-Off Tasks</h2>
+                <p><strong>${selectedTasks.size} task${selectedTasks.size !== 1 ? 's' : ''} for {{ trainee.full_name }}:</strong></p>
+                <div class="selected-trainees-list">
+                    ${tasksArray.map(t => `<div>${t.name}${t.requiresScore ? ' (Score Required)' : ''}</div>`).join('')}
                 </div>
-            `;
-        });
-    }
 
-    // Create modal overlay
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content bulk-modal">
-            <h2>Bulk Sign-Off Tasks</h2>
-            <p><strong>${selectedTasks.size} task${selectedTasks.size !== 1 ? 's' : ''} for {{ trainee.full_name }}:</strong></p>
-            <div class="selected-trainees-list">
-                ${tasksArray.map(t => `<div>${t.name}${t.requiresScore ? ' (Score Required)' : ''}</div>`).join('')}
+                ${scoreInputsHTML}
+
+                <div class="form-group">
+                    <label for="bulkTaskNotesInput">Notes (optional):</label>
+                    <textarea id="bulkTaskNotesInput" class="form-control" rows="3" placeholder="Enter any notes..."></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="confirmBulkTaskSignOff" class="btn btn-primary">Sign Off ${selectedTasks.size} Task${selectedTasks.size !== 1 ? 's' : ''}</button>
+                    <button id="cancelBulkTaskSignOff" class="btn">Cancel</button>
+                </div>
+
+                <div id="bulkTaskProgress" class="bulk-progress" style="display: none;">
+                    <div class="progress-spinner"></div>
+                    <p>Processing sign-offs...</p>
+                </div>
             </div>
+        `;
 
-            ${scoreInputsHTML}
+        document.body.appendChild(modal);
 
-            <div class="form-group">
-                <label for="bulkTaskNotesInput">Notes (optional):</label>
-                <textarea id="bulkTaskNotesInput" class="form-control" rows="3" placeholder="Enter any notes..."></textarea>
-            </div>
+        // Handle confirmation
+        document.getElementById('confirmBulkTaskSignOff').addEventListener('click', async function() {
+            const notes = document.getElementById('bulkTaskNotesInput').value.trim();
 
-            <div class="modal-actions">
-                <button id="confirmBulkTaskSignOff" class="btn btn-primary">Sign Off ${selectedTasks.size} Task${selectedTasks.size !== 1 ? 's' : ''}</button>
-                <button id="cancelBulkTaskSignOff" class="btn">Cancel</button>
-            </div>
+            // Collect scores
+            const scores = {};
+            let hasErrors = false;
 
-            <div id="bulkTaskProgress" class="bulk-progress" style="display: none;">
-                <div class="progress-spinner"></div>
-                <p>Processing sign-offs...</p>
-            </div>
-        </div>
-    `;
+            tasksArray.forEach(task => {
+                if (task.requiresScore) {
+                    const scoreInput = document.getElementById(`score_${task.id}`);
+                    const score = scoreInput ? scoreInput.value.trim() : '';
 
-    document.body.appendChild(modal);
-
-    // Handle confirmation
-    document.getElementById('confirmBulkTaskSignOff').addEventListener('click', async function() {
-        const notes = document.getElementById('bulkTaskNotesInput').value.trim();
-
-        // Collect scores
-        const scores = {};
-        let hasErrors = false;
-
-        tasksArray.forEach(task => {
-            if (task.requiresScore) {
-                const scoreInput = document.getElementById(`score_${task.id}`);
-                const score = scoreInput ? scoreInput.value.trim() : '';
-
-                if (!score) {
-                    alert(`Score required for task: ${task.name}`);
-                    hasErrors = true;
-                    return;
-                }
-
-                if (task.minScore) {
-                    const scoreValue = parseFloat(score);
-                    const minScore = parseFloat(task.minScore);
-                    if (scoreValue < minScore) {
-                        alert(`Score for "${task.name}" must be at least ${minScore}`);
+                    if (!score) {
+                        alert(`Score required for task: ${task.name}`);
                         hasErrors = true;
                         return;
                     }
+
+                    if (task.minScore) {
+                        const scoreValue = parseFloat(score);
+                        const minScore = parseFloat(task.minScore);
+                        if (scoreValue < minScore) {
+                            alert(`Score for "${task.name}" must be at least ${minScore}`);
+                            hasErrors = true;
+                            return;
+                        }
+                    }
+
+                    scores[task.id] = score;
                 }
-
-                scores[task.id] = score;
-            }
-        });
-
-        if (hasErrors) return;
-
-        // Show progress
-        document.getElementById('bulkTaskProgress').style.display = 'block';
-        this.disabled = true;
-
-        // Prepare data
-        const data = {
-            trainee_ids: [{{ trainee.id }}],
-            task_ids: tasksArray.map(t => parseInt(t.id)),
-            scores: scores,
-            notes: notes
-        };
-
-        try {
-            const response = await fetch('{% url "bulk_sign_off" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify(data)
             });
 
-            const result = await response.json();
+            if (hasErrors) return;
 
-            if (result.success) {
-                alert(`Success!\n\nCreated: ${result.created}\nUpdated: ${result.updated}\n${result.skipped.length > 0 ? `Skipped: ${result.skipped.length}` : ''}`);
-                document.body.removeChild(modal);
-                location.reload(); // Reload to show updated tasks
-            } else {
-                alert(`Error: ${result.error}\n\n${result.errors.map(e => `${e.task}: ${e.error}`).join('\n')}`);
+            // Show progress
+            document.getElementById('bulkTaskProgress').style.display = 'block';
+            this.disabled = true;
+
+            // Prepare data
+            const data = {
+                trainee_ids: [{{ trainee.id }}],
+                task_ids: tasksArray.map(t => parseInt(t.id)),
+                scores: scores,
+                notes: notes
+            };
+
+            try {
+                const response = await fetch('{% url "bulk_sign_off" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`Success!\n\nCreated: ${result.created}\nUpdated: ${result.updated}\n${result.skipped.length > 0 ? `Skipped: ${result.skipped.length}` : ''}`);
+                    document.body.removeChild(modal);
+                    location.reload(); // Reload to show updated tasks
+                } else {
+                    alert(`Error: ${result.error}\n\n${result.errors.map(e => `${e.task}: ${e.error}`).join('\n')}`);
+                    document.getElementById('bulkTaskProgress').style.display = 'none';
+                    this.disabled = false;
+                }
+            } catch (error) {
+                alert('An error occurred while processing bulk sign-off: ' + error.message);
                 document.getElementById('bulkTaskProgress').style.display = 'none';
                 this.disabled = false;
             }
-        } catch (error) {
-            alert('An error occurred while processing bulk sign-off: ' + error.message);
-            document.getElementById('bulkTaskProgress').style.display = 'none';
-            this.disabled = false;
-        }
-    });
+        });
 
-    // Handle cancel
-    document.getElementById('cancelBulkTaskSignOff').addEventListener('click', function() {
-        document.body.removeChild(modal);
-    });
-
-    // Close on overlay click
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
+        // Handle cancel
+        document.getElementById('cancelBulkTaskSignOff').addEventListener('click', function() {
             document.body.removeChild(modal);
-        }
-    });
-}
+        });
+
+        // Close on overlay click
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+    }
+}); // End DOMContentLoaded
 </script>
 
 <!-- Unsign Modal -->
