@@ -195,11 +195,17 @@ def trainee_detail(request, badge_number):
     task_progress = []
     for task in tasks:
         signoff = signoff_dict.get(task.id)
+        # Can unsign if: 1) has signoff, 2) is staff, AND 3) either is superuser OR authorized for this task
+        can_unsign = (
+            signoff is not None and
+            (request.user.is_staff or request.user.is_superuser) and
+            (request.user.is_superuser or task.can_user_sign_off(request.user))
+        )
         task_progress.append({
             'task': task,
             'signoff': signoff,
             'can_sign_off': task.can_user_sign_off(request.user),
-            'can_unsign': signoff is not None and (request.user.is_staff or request.user.is_superuser),
+            'can_unsign': can_unsign,
         })
 
     context = {
@@ -215,6 +221,15 @@ def sign_off_task(request, badge_number, task_id):
     if request.method == 'POST':
         trainee = get_object_or_404(Trainee, badge_number=badge_number)
         task = get_object_or_404(Task, id=task_id)
+
+        # Check if user has staff profile with sign-off permission
+        try:
+            if not request.user.staff_profile.can_sign_off:
+                messages.error(request, 'Your account does not have sign-off permissions. Contact an administrator.')
+                return redirect('trainee_detail', badge_number=badge_number)
+        except AttributeError:
+            messages.error(request, 'Staff profile not found. Contact an administrator to set up your account.')
+            return redirect('trainee_detail', badge_number=badge_number)
 
         # Check if user is authorized to sign off this task
         if not task.can_user_sign_off(request.user):
@@ -272,6 +287,11 @@ def unsign_task(request, badge_number, task_id):
         # Check if user has permission to unsign (staff/superuser only)
         if not (request.user.is_staff or request.user.is_superuser):
             messages.error(request, 'You do not have permission to remove sign-offs.')
+            return redirect('trainee_detail', badge_number=badge_number)
+
+        # Check if user is authorized for this specific task (superuser can override)
+        if not request.user.is_superuser and not task.can_user_sign_off(request.user):
+            messages.error(request, f'You are not authorized to remove sign-offs for "{task.name}".')
             return redirect('trainee_detail', badge_number=badge_number)
 
         try:
@@ -422,6 +442,13 @@ def bulk_sign_off(request):
 
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    # Check if user has staff profile with sign-off permission
+    try:
+        if not request.user.staff_profile.can_sign_off:
+            return JsonResponse({'success': False, 'error': 'Your account does not have sign-off permissions'}, status=403)
+    except AttributeError:
+        return JsonResponse({'success': False, 'error': 'Staff profile not found. Contact an administrator'}, status=403)
 
     try:
         data = json.loads(request.body)

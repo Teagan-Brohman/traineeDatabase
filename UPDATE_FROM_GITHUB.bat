@@ -68,14 +68,14 @@ if errorlevel 1 (
 )
 echo.
 
-echo [STEP 3/5] Pulling latest code...
-git pull origin main
+echo [STEP 3/5] Updating code to match GitHub...
+REM Force update tracked files to match GitHub (keeps untracked files like db.sqlite3, .env)
+git reset --hard origin/main
 if errorlevel 1 (
-    echo ERROR: Failed to pull updates
-    echo You may have local changes that conflict
+    echo ERROR: Failed to update code
     echo.
     pause
-    exit /b 1
+    
 )
 echo Code updated successfully!
 echo.
@@ -83,7 +83,7 @@ echo.
 echo [STEP 4/5] Updating dependencies...
 if exist "venv\Scripts\activate.bat" (
     call venv\Scripts\activate.bat
-    pip install -r requirements.txt --upgrade --quiet
+    pip install -r requirements.txt --upgrade 
     echo Dependencies updated
 ) else (
     echo WARNING: Virtual environment not found

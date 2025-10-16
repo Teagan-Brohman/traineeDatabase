@@ -23,6 +23,16 @@ def logout_view(request):
     logout(request)
     return redirect('/admin/login/')
 
+# Override admin index to redirect to tracker
+_original_admin_index = admin.site.index
+def custom_admin_index(request, extra_context=None):
+    """Redirect to tracker after login (superusers can access admin with ?admin=1)"""
+    if request.user.is_superuser and request.GET.get('admin') == '1':
+        return _original_admin_index(request, extra_context)
+    return redirect('trainee_list')
+
+admin.site.index = custom_admin_index
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('tracker/', include('tracker.urls')),

@@ -111,8 +111,32 @@ class TraineeAdmin(admin.ModelAdmin):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
 
+class TaskAdminForm(forms.ModelForm):
+    """Custom form to allow order conflicts (model's save() will auto-shift)"""
+    class Meta:
+        model = Task
+        fields = '__all__'
+
+    def clean_order(self):
+        """
+        Allow duplicate order numbers during form validation.
+        The model's save() method will handle auto-shifting to resolve conflicts.
+        """
+        order = self.cleaned_data.get('order')
+
+        # Check if this order conflicts with another task
+        existing_task = Task.objects.filter(order=order).exclude(pk=self.instance.pk).first()
+
+        if existing_task:
+            # Instead of raising an error, add a message to help_text
+            # The save() method will auto-shift other tasks
+            self.instance._order_conflict_info = f"Will auto-shift '{existing_task.name}' and subsequent tasks"
+
+        return order
+
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
+    form = TaskAdminForm
     list_display = ('order', 'name', 'category', 'requires_score', 'minimum_score', 'is_active', 'authorized_count')
     list_filter = ('category', 'requires_score', 'is_active')
     search_fields = ('name', 'description')
@@ -120,7 +144,8 @@ class TaskAdmin(admin.ModelAdmin):
     filter_horizontal = ('authorized_signers',)
     fieldsets = (
         ('Basic Information', {
-            'fields': ('order', 'name', 'description', 'category', 'is_active')
+            'fields': ('order', 'name', 'description', 'category', 'is_active'),
+            'description': 'Order will auto-shift existing tasks if there\'s a conflict'
         }),
         ('Scoring Requirements', {
             'fields': ('requires_score', 'minimum_score'),
@@ -131,6 +156,13 @@ class TaskAdmin(admin.ModelAdmin):
             'description': 'Leave empty to allow all staff to sign off this task'
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        """Save with helpful message about auto-shifting"""
+        super().save_model(request, obj, form, change)
+        if hasattr(obj, '_order_conflict_info'):
+            from django.contrib import messages
+            messages.info(request, f"Task order saved. {obj._order_conflict_info}.")
 
     def authorized_count(self, obj):
         count = obj.authorized_signers.count()

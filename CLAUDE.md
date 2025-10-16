@@ -59,6 +59,10 @@ The application uses four interconnected models in `tracker/models.py`:
 /tracker/                   -> List all trainees (trainee_list view)
 /tracker/<badge_number>/    -> Detail view for one trainee (trainee_detail view)
 /tracker/<badge_number>/signoff/<task_id>/  -> POST endpoint to sign off task
+/tracker/<badge_number>/unsign/<task_id>/   -> POST endpoint to remove sign-off
+/tracker/bulk-signoff/      -> POST endpoint for bulk operations (JSON)
+/tracker/export/            -> Export current cohort to Excel
+/tracker/archive/           -> View archived cohorts
 /admin/                     -> Django admin interface
 ```
 
@@ -103,10 +107,43 @@ Uses SQLite (`db.sqlite3`) stored in project root. For production or network dep
 
 Templates in `tracker/templates/tracker/`:
 - `base.html` - Contains all CSS (no external stylesheets), provides layout structure
-- `trainee_list.html` - Shows all trainees with progress bars
-- `trainee_detail.html` - Shows task checklist with inline JavaScript modal for sign-offs
+- `trainee_list.html` - Shows all trainees with progress bars, bulk operations UI
+- `trainee_detail.html` - Shows task checklist with inline JavaScript modals for sign-offs
+- `archive_list.html` - Shows archived cohorts with search functionality
 
-**Modal Sign-Off Pattern**: Uses vanilla JavaScript modal (no framework) that POSTs to sign-off endpoint with CSRF token.
+### Django Template + JavaScript Pattern
+
+**This application uses Django Template Language (DTL) mixed with JavaScript - this is the standard Django approach:**
+
+1. **Files are `.html` Django templates** that combine:
+   - Django template tags: `{% extends %}`, `{% for %}`, `{% if %}`
+   - Django variables: `{{ trainee.badge_number }}`, `{{ csrf_token }}`
+   - HTML markup: `<div>`, `<table>`, `<button>`
+   - JavaScript code: `<script>` blocks with client-side logic
+
+2. **Processing flow**:
+   - **Server-side**: Django processes the template first, replacing all `{{ }}` and `{% %}` with actual values
+   - **Browser receives**: Pure HTML + JavaScript (no Django syntax remains)
+   - **Client-side**: JavaScript runs in browser, handles interactions, makes AJAX calls back to Django
+
+3. **Key pattern examples**:
+   ```django
+   <!-- Django generates the URL -->
+   fetch('{% url "bulk_sign_off" %}', {...})
+
+   <!-- Django inserts CSRF token -->
+   headers: {'X-CSRFToken': '{{ csrf_token }}'}
+
+   <!-- Django loops to create JavaScript data -->
+   {% for task in tasks %}
+       taskData.push({id: {{ task.id }}, name: '{{ task.name|escapejs }}'});
+   {% endfor %}
+   ```
+
+4. **Modal Sign-Off Pattern**: Uses vanilla JavaScript modals (no framework) that:
+   - Are created dynamically via `document.createElement()`
+   - POST to Django endpoints with CSRF token protection
+   - Use AJAX (`fetch`) for bulk operations to avoid page reloads
 
 ## Settings Configuration
 
@@ -147,6 +184,16 @@ When modifying views:
 - Use `get_object_or_404` for lookups by badge_number or task_id
 - Add success messages via `messages.success()` for user feedback
 - Always redirect after POST (POST-Redirect-GET pattern)
+- For JSON endpoints (like bulk_sign_off), return `JsonResponse` instead of redirecting
+
+When working with templates:
+- Templates are `.html` files that mix Django Template Language + HTML + JavaScript
+- Django processes templates server-side before sending to browser
+- JavaScript in templates has access to Django context via template variables
+- **Important**: Use `{% url 'view_name' %}` to generate URLs, never hardcode paths
+- **Important**: Always include `{{ csrf_token }}` for POST requests from JavaScript
+- Use `|escapejs` filter when embedding Django strings in JavaScript: `'{{ value|escapejs }}'`
+- Context variables must be passed from views (e.g., `tasks` for bulk operations dropdowns)
 
 ## Excel Import Format Expectations
 
