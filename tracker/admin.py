@@ -134,6 +134,23 @@ class TaskAdminForm(forms.ModelForm):
 
         return order
 
+    def validate_unique(self):
+        """
+        Skip unique validation for 'order' field.
+        The model's save() method handles conflicts via auto-shifting.
+        """
+        from django.core.exceptions import ValidationError
+
+        # Get fields to exclude from uniqueness validation
+        exclude = self._get_validation_exclusions()
+        exclude.add('order')  # Don't validate order uniqueness here
+
+        # Validate uniqueness for all other fields
+        try:
+            self.instance.validate_unique(exclude=exclude)
+        except ValidationError as e:
+            self._update_errors(e)
+
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
     form = TaskAdminForm

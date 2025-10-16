@@ -190,10 +190,24 @@ function closeSignOffModal() {
     document.getElementById('signOffForm').reset();
 }
 
-// Close modal when clicking outside
-document.getElementById('signOffModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeSignOffModal();
+// Close modal when clicking outside - wait for DOM to load
+document.addEventListener('DOMContentLoaded', function() {
+    const signOffModal = document.getElementById('signOffModal');
+    if (signOffModal) {
+        signOffModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeSignOffModal();
+            }
+        });
+    }
+
+    const unsignModal = document.getElementById('unsignModal');
+    if (unsignModal) {
+        unsignModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeUnsignModal();
+            }
+        });
     }
 });
 
@@ -209,13 +223,6 @@ function closeUnsignModal() {
     document.getElementById('unsignForm').reset();
 }
 
-// Close unsign modal when clicking outside
-document.getElementById('unsignModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeUnsignModal();
-    }
-});
-
 // ========================================
 // BULK OPERATIONS FOR TRAINEE DETAIL
 // ========================================
@@ -229,8 +236,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const taskCheckboxes = document.querySelectorAll('.task-checkbox');
 
     // Safety checks - exit if critical elements don't exist
-    if (!bulkToolbarDetail || !selectAllTasksCheckbox) {
-        console.warn('Bulk operations elements not found');
+    if (!bulkToolbarDetail || !selectAllTasksCheckbox || !selectedTaskCountSpan ||
+        !bulkSignOffTasksBtn || !clearTaskSelectionBtn) {
+        console.warn('Bulk operations: Some required elements not found');
+        console.log('Elements found:', {
+            toolbar: !!bulkToolbarDetail,
+            selectAll: !!selectAllTasksCheckbox,
+            countSpan: !!selectedTaskCountSpan,
+            signOffBtn: !!bulkSignOffTasksBtn,
+            clearBtn: !!clearTaskSelectionBtn,
+            checkboxCount: taskCheckboxes.length
+        });
         return;
     }
 
