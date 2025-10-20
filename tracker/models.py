@@ -1,5 +1,6 @@
 from django.db import models, transaction
 from django.contrib.auth.models import User
+from django.core.validators import RegexValidator
 from datetime import date
 
 class Cohort(models.Model):
@@ -111,7 +112,7 @@ class Trainee(models.Model):
 class Task(models.Model):
     order = models.IntegerField(unique=True, db_index=True, help_text="Display order (must be unique)")
     name = models.CharField(max_length=200, db_index=True)
-    description = models.TextField(blank=True)
+    description = models.TextField(blank=True, max_length=10000)
     category = models.CharField(max_length=100, blank=True, db_index=True, help_text="e.g., Security, Safety, Documentation")
     requires_score = models.BooleanField(default=False, help_text="Does this task require a quiz score?")
     minimum_score = models.DecimalField(
@@ -184,12 +185,18 @@ class Task(models.Model):
 
 
 class SignOff(models.Model):
+    # Score validator: allows decimal numbers like "95", "95.5", "100.00"
+    score_validator = RegexValidator(
+        regex=r'^\d+(\.\d{1,2})?$',
+        message='Score must be a valid number (e.g., 95, 95.5, 100.00)'
+    )
+
     trainee = models.ForeignKey(Trainee, on_delete=models.CASCADE, related_name='signoffs', db_index=True)
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='signoffs', db_index=True)
     signed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='signoffs_given', db_index=True)
     signed_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    notes = models.TextField(blank=True, help_text="Any comments or notes")
-    score = models.CharField(max_length=20, blank=True, help_text="Quiz score if applicable")
+    notes = models.TextField(blank=True, max_length=10000, help_text="Any comments or notes")
+    score = models.CharField(max_length=20, blank=True, validators=[score_validator], help_text="Quiz score if applicable (e.g., 95, 95.5)")
 
     class Meta:
         unique_together = ['trainee', 'task']
@@ -226,7 +233,7 @@ class UnsignLog(models.Model):
     )
     original_signed_at = models.DateTimeField(db_index=True, help_text="When original sign-off occurred")
     original_score = models.CharField(max_length=20, blank=True)
-    original_notes = models.TextField(blank=True)
+    original_notes = models.TextField(blank=True, max_length=10000)
     unsigned_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -236,7 +243,7 @@ class UnsignLog(models.Model):
         help_text="Who removed the sign-off"
     )
     unsigned_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    reason = models.TextField(blank=True, help_text="Reason for removal")
+    reason = models.TextField(blank=True, max_length=10000, help_text="Reason for removal")
 
     class Meta:
         ordering = ['-unsigned_at']

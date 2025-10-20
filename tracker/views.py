@@ -2,7 +2,12 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
+from django.utils.text import slugify
+import logging
 from .models import Trainee, Task, SignOff, UnsignLog, Cohort
+
+# Security logger for audit trail
+security_logger = logging.getLogger('security')
 
 @login_required
 def trainee_list(request):
@@ -172,7 +177,9 @@ def export_cohort_excel(request, cohort_id=None):
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    filename = f'Check list Orientation {cohort.name}.xlsx'
+    # Sanitize filename to prevent path traversal attacks
+    safe_cohort_name = slugify(cohort.name)
+    filename = f'Check_list_Orientation_{safe_cohort_name}.xlsx'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     # Save workbook to response
@@ -239,6 +246,11 @@ def sign_off_task(request, badge_number, task_id):
         score = request.POST.get('score', '').strip()
         notes = request.POST.get('notes', '')
 
+        # Validate notes length
+        if len(notes) > 10000:
+            messages.error(request, 'Notes exceed maximum length of 10,000 characters.')
+            return redirect('trainee_detail', badge_number=badge_number)
+
         # Validate score if task requires it
         if task.requires_score and task.minimum_score is not None:
             if not score:
@@ -297,6 +309,12 @@ def unsign_task(request, badge_number, task_id):
         try:
             signoff = SignOff.objects.get(trainee=trainee, task=task)
 
+            # Validate reason length
+            reason = request.POST.get('reason', '')
+            if len(reason) > 10000:
+                messages.error(request, 'Reason exceeds maximum length of 10,000 characters.')
+                return redirect('trainee_detail', badge_number=badge_number)
+
             # Create audit log before deleting
             UnsignLog.objects.create(
                 trainee=trainee,
@@ -306,11 +324,18 @@ def unsign_task(request, badge_number, task_id):
                 original_score=signoff.score,
                 original_notes=signoff.notes,
                 unsigned_by=request.user,
-                reason=request.POST.get('reason', '')
+                reason=reason
             )
 
             # Delete the sign-off
             signoff.delete()
+
+            # Log security event
+            security_logger.info(
+                'Unsign action: trainee=%s, task=%s, original_signer=%s, unsigned_by=%s',
+                trainee.badge_number, task.name, signoff.signed_by.username if signoff.signed_by else 'Unknown',
+                request.user.username
+            )
 
             messages.success(request, f'Sign-off for "{task.name}" has been removed.')
 
@@ -329,6 +354,10 @@ def archive_list(request):
 
     current_cohort = Cohort.get_current_cohort()
     search_query = request.GET.get('search', '').strip()
+
+    # Limit search query length to prevent performance issues
+    if len(search_query) > 100:
+        search_query = search_query[:100]
 
     # If search query provided, search across ALL trainees
     search_results = []
@@ -464,6 +493,16 @@ def bulk_sign_off(request):
     if not trainee_ids or not task_ids:
         return JsonResponse({'success': False, 'error': 'Must select at least one trainee and one task'}, status=400)
 
+    # Limit bulk operations to prevent DoS attacks
+    if len(trainee_ids) > 100:
+        return JsonResponse({'success': False, 'error': 'Maximum 100 trainees allowed per bulk operation'}, status=400)
+    if len(task_ids) > 100:
+        return JsonResponse({'success': False, 'error': 'Maximum 100 tasks allowed per bulk operation'}, status=400)
+
+    # Validate notes length
+    if len(notes) > 10000:
+        return JsonResponse({'success': False, 'error': 'Notes exceed maximum length of 10,000 characters'}, status=400)
+
     results = {
         'success': True,
         'created': 0,
@@ -545,8 +584,15 @@ def bulk_sign_off(request):
                 transaction.set_rollback(True)
                 results['success'] = False
                 results['error'] = f"{len(results['errors'])} validation errors occurred. No changes made."
+            else:
+                # Log successful bulk operation
+                security_logger.info(
+                    'Bulk sign-off: %d trainees, %d tasks, %d created, %d updated by %s',
+                    len(trainee_ids), len(task_ids), results['created'], results['updated'], request.user.username
+                )
 
     except Exception as e:
+        security_logger.error('Bulk sign-off failed: %s by %s', str(e), request.user.username)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
     return JsonResponse(results)

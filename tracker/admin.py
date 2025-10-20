@@ -131,7 +131,11 @@ class TraineeAdmin(admin.ModelAdmin):
         except Cohort.DoesNotExist:
             return JsonResponse({'error': 'Cohort not found'}, status=404)
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            # Log the actual error for debugging but don't expose it to users
+            import logging
+            logger = logging.getLogger('tracker')
+            logger.error('Error generating badge number for cohort %d: %s', cohort_id, str(e))
+            return JsonResponse({'error': 'Unable to generate badge number. Please contact administrator.'}, status=500)
 
 class TaskAdminForm(forms.ModelForm):
     """Custom form to allow order conflicts (model's save() will auto-shift)"""

@@ -28,6 +28,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
+# Security: Limit request body size to prevent DoS attacks (5MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB in bytes
 
 # Application definition
 
@@ -143,6 +145,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/admin/login/'
 LOGIN_REDIRECT_URL = '/tracker/'
 
+# Session Security
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection for session cookies
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)  # HTTPS only in production
+
+# Security Headers
+SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME-sniffing attacks
+X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking attacks
+
 # Security Settings
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 
@@ -193,5 +204,16 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
+        'security': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
+
+# Security Event Logging Configuration
+# To enable security event logging in views, add:
+# import logging
+# security_logger = logging.getLogger('security')
+# security_logger.info('Bulk sign-off: %d trainees, %d tasks by %s', len(trainee_ids), len(task_ids), request.user.username)
