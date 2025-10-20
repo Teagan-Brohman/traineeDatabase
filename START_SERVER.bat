@@ -68,7 +68,7 @@ call venv\Scripts\activate.bat
 
 echo [3/6] Checking if server is already running...
 netstat -ano | findstr ":8000" | findstr "LISTENING" >nul 2>&1
-if not errorlevel 1 (
+if %ERRORLEVEL% EQU 0 (
     echo.
     echo ===============================================
     echo WARNING: Server already running on port 8000!
