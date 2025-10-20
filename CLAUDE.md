@@ -291,3 +291,254 @@ Comprehensive test suite in `tracker/tests.py:BulkSignOffTestCase`:
 - Invalid JSON handling
 
 See tests for examples of expected behavior and edge cases.
+
+---
+
+## TEMPORARY: Network Drive SQLite Safeguards
+
+**⚠️ IMPORTANT: This section describes TEMPORARY solutions implemented to mitigate risks of running SQLite on a network drive.**
+
+**These safeguards should be REMOVED when migrating to PostgreSQL.**
+
+### Background
+
+SQLite databases are NOT designed for network file systems. Running `db.sqlite3` on a network drive poses serious risks:
+- **Database corruption** from concurrent access
+- **"Database is locked" errors** even with 2-3 users
+- **Data loss** from simultaneous writes
+- **Poor performance** due to network latency
+
+The proper solution is migrating to PostgreSQL. However, as a temporary measure, the following safeguards are in place.
+
+### Implemented Safeguards
+
+#### 1. Hybrid Server Lock System (`START_SERVER.bat`)
+
+**Purpose:** Prevent multiple Django servers from running simultaneously and accessing the same database.
+
+**How it works:**
+- Creates `SERVER_LOCK` file when server starts
+- Contains: computer name, user, start time, IP address
+- Heartbeat updater updates timestamp every 60 seconds
+- Lock detection uses 3-tier logic:
+  - **Lock < 5 minutes old**: Hard block (server definitely running)
+  - **Lock 5-10 minutes old**: Ask user to force unlock (might be crashed)
+  - **Lock > 10 minutes old**: Auto-cleanup and start (definitely crashed)
+
+**Files involved:**
+- `START_SERVER.bat` - Lock creation and detection logic
+- `heartbeat_updater.ps1` - Background PowerShell script updating heartbeat
+- `SERVER_LOCK` - Lock file (auto-generated, auto-deleted)
+
+**Error messages:**
+- "ERROR: Server already running!" → Another computer has active server (< 5 min)
+- "WARNING: Server lock detected" → Possibly stale lock (5-10 min), user decides
+- "AUTO-RECOVERY: Stale lock detected" → Old lock (> 10 min), auto-cleaned
+
+#### 2. Idle Timeout Monitor (`idle_monitor.py`)
+
+**Purpose:** Automatically shutdown server after period of inactivity to release database lock.
+
+**Configuration:**
+- Default timeout: **120 minutes** (2 hours)
+- Check interval: 5 minutes
+- Configurable via environment variables:
+  ```batch
+  set IDLE_TIMEOUT_MINUTES=180
+  set CHECK_INTERVAL_SECONDS=300
+  ```
+
+**How it works:**
+- Monitors `LAST_ACTIVITY.txt` file updated by Django middleware
+- Calculates idle time since last HTTP request
+- Gracefully shuts down server if idle timeout exceeded
+- Cleans up lock file on shutdown
+- Logs activity to `idle_monitor.log`
+
+**Files involved:**
+- `idle_monitor.py` - Python script monitoring activity
+- `LAST_ACTIVITY.txt` - Timestamp of last request (auto-generated)
+- `tracker/middleware.py` - ActivityTrackerMiddleware updates timestamp
+- `idle_monitor.log` - Activity log
+
+#### 3. SQLite Network Optimizations (`settings.py`)
+
+**Purpose:** Configure SQLite for better (but not perfect) concurrent access tolerance.
+
+**Settings applied:**
+```python
+DATABASES = {
+    'default': {
+        'OPTIONS': {
+            'timeout': 30,  # Wait up to 30 seconds for locks
+            'check_same_thread': False,
+            'init_command': (
+                'PRAGMA journal_mode=WAL;'  # Write-Ahead Logging
+                'PRAGMA synchronous=NORMAL;'
+                'PRAGMA cache_size=-64000;'  # 64MB cache
+                'PRAGMA busy_timeout=30000;'
+            ),
+        }
+    }
+}
+CONN_MAX_AGE = 0  # No persistent connections
+```
+
+**What these do:**
+- **WAL mode**: Allows concurrent reads during writes (partial improvement)
+- **Busy timeout**: Waits longer before "database locked" error
+- **No persistent connections**: Forces fresh connection each request (data consistency)
+- **Larger cache**: Reduces disk I/O over network
+
+#### 4. Activity Tracking Middleware (`tracker/middleware.py`)
+
+**Purpose:** Track last HTTP request for idle monitoring.
+
+**Implementation:**
+```python
+class ActivityTrackerMiddleware:
+    def __call__(self, request):
+        self.update_activity()  # Write timestamp to file
+        return self.get_response(request)
+```
+
+**Files involved:**
+- `tracker/middleware.py` - Middleware class
+- `LAST_ACTIVITY.txt` - Timestamp file
+- Registered in `settings.py` MIDDLEWARE list
+
+### User Experience
+
+**Starting Server:**
+```
+[3/6] Checking for server lock...
+[6/6] Starting server...
+Lock file created successfully.
+Starting heartbeat updater...
+Starting idle monitor (timeout: 120 minutes)...
+
+TEMPORARY SAFEGUARDS ACTIVE:
+- Server lock prevents multiple instances
+- Auto-shutdown after 120 min of inactivity
+- Heartbeat updates every 60 seconds
+```
+
+**If Another Server Running:**
+```
+ERROR: Server already running!
+Computer: WORKSTATION-05
+Started: 2025-01-15 09:00:15
+Last heartbeat: 2025-01-15 11:32:45
+Lock age: 3 minutes
+
+Please stop the server on WORKSTATION-05 first.
+```
+
+**After Crash (Stale Lock):**
+```
+AUTO-RECOVERY: Stale lock detected
+Lock age: 15 minutes
+Previous server: WORKSTATION-05
+
+Auto-cleaning and starting new server...
+```
+
+### Troubleshooting
+
+**Q: "Database is locked" errors still occurring**
+- Only ONE server should run at a time (check `SERVER_LOCK`)
+- Verify `db.sqlite3` is on network drive (expected behavior)
+- Consider reducing idle timeout to release lock sooner
+- **Long-term:** Migrate to PostgreSQL
+
+**Q: Server auto-shutdown too frequently**
+- Increase `IDLE_TIMEOUT_MINUTES` in `idle_monitor.py`
+- Check `idle_monitor.log` for activity patterns
+- Note: Idle timeout prevents lock hogging
+
+**Q: Can't start server - lock file won't clear**
+- Manually delete `SERVER_LOCK` if server definitely not running
+- Check other computers for running servers
+- Run `STOP_SERVER.bat` to force cleanup
+
+**Q: Multiple servers started accidentally**
+- Lock detection only works if `START_SERVER.bat` is used
+- Check for `python manage.py runserver` processes manually started
+- Run `STOP_SERVER.bat` to kill all servers and clean up
+
+### Files to Remove When Migrating to PostgreSQL
+
+**Delete these files:**
+```
+heartbeat_updater.ps1
+idle_monitor.py
+idle_monitor.log (if exists)
+SERVER_LOCK (if exists)
+LAST_ACTIVITY.txt (if exists)
+tracker/middleware.py
+```
+
+**Update these files:**
+
+`START_SERVER.bat`:
+- Remove lock detection logic (lines 69-157)
+- Remove heartbeat/idle monitor launch (lines 167-197)
+- Remove cleanup on stop (lines 236-245)
+- Remove "TEMPORARY SAFEGUARDS ACTIVE" message
+
+`STOP_SERVER.bat`:
+- Remove background process cleanup (lines 37-70)
+
+`settings.py`:
+- Remove `ActivityTrackerMiddleware` from MIDDLEWARE
+- Remove SQLite-specific OPTIONS and CONN_MAX_AGE
+- Update DATABASES to PostgreSQL configuration:
+  ```python
+  DATABASES = {
+      'default': {
+          'ENGINE': 'django.db.backends.postgresql',
+          'NAME': 'trainee_tracker',
+          'USER': 'postgres',
+          'PASSWORD': '<password>',
+          'HOST': 'localhost',
+          'PORT': '5432',
+      }
+  }
+  CONN_MAX_AGE = 600  # 10 minutes (safe for PostgreSQL)
+  ```
+
+`CLAUDE.md`:
+- Remove this entire "TEMPORARY: Network Drive SQLite Safeguards" section
+
+### Migration to PostgreSQL Checklist
+
+When ready to migrate from SQLite to PostgreSQL:
+
+- [ ] Install PostgreSQL on server/network
+- [ ] Create database: `CREATE DATABASE trainee_tracker;`
+- [ ] Create user with permissions
+- [ ] Install psycopg2: `pip install psycopg2-binary`
+- [ ] Export SQLite data: `python manage.py dumpdata > data.json`
+- [ ] Update `settings.py` with PostgreSQL config
+- [ ] Migrate schema: `python manage.py migrate`
+- [ ] Import data: `python manage.py loaddata data.json`
+- [ ] Test application thoroughly
+- [ ] Remove all temporary files listed above
+- [ ] Update `START_SERVER.bat` and `STOP_SERVER.bat`
+- [ ] Remove this section from `CLAUDE.md`
+- [ ] Enjoy proper concurrent access! 🎉
+
+### Why These Safeguards Are Not Perfect
+
+**These measures reduce but do NOT eliminate risks:**
+
+1. **Lock file can be deleted manually** - User can bypass protection
+2. **Race conditions still possible** - Brief window between lock checks
+3. **Network file locking unreliable** - SMB/NFS don't guarantee atomicity
+4. **Cache coherency issues** - Django caches data, may serve stale reads
+5. **Performance degradation** - Network latency on every database operation
+6. **Corruption still possible** - Simultaneous writes, network issues, crashes
+
+**The ONLY proper solution is PostgreSQL** - a client-server database designed for concurrent network access.
+
+These safeguards are a **temporary compromise** to allow network access while planning migration.

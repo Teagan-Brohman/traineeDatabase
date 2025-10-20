@@ -34,6 +34,41 @@ if "%ERRORLEVEL%"=="0" (
     echo The server may already be stopped.
 )
 
+REM ========================================
+REM TEMPORARY: Cleanup server lock and background processes
+REM ========================================
+echo.
+echo Cleaning up background processes...
+
+REM Stop heartbeat updater (PowerShell process)
+taskkill /FI "WINDOWTITLE eq Heartbeat Updater*" /F >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo - Heartbeat updater stopped
+)
+
+REM Stop idle monitor (Python process)
+for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO LIST ^| find "PID:"') do (
+    wmic process where "ProcessId=%%a" get CommandLine 2>NUL | find "idle_monitor.py" >NUL
+    if not errorlevel 1 (
+        echo - Idle monitor stopped
+        taskkill /PID %%a /F >NUL 2>&1
+    )
+)
+
+REM Remove server lock file
+if exist "SERVER_LOCK" (
+    del SERVER_LOCK
+    echo - Server lock file removed
+)
+
+REM Remove activity tracking file
+if exist "LAST_ACTIVITY.txt" (
+    del LAST_ACTIVITY.txt
+    echo - Activity tracking file removed
+)
+
+echo Cleanup complete.
+
 echo.
 echo ===============================================
 echo.

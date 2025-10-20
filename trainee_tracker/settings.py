@@ -51,6 +51,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'tracker.middleware.ActivityTrackerMiddleware',  # TEMPORARY: Track activity for idle monitoring
 ]
 
 ROOT_URLCONF = 'trainee_tracker.urls'
@@ -79,12 +80,28 @@ WSGI_APPLICATION = 'trainee_tracker.wsgi.application'
 DATABASE_ENGINE = config('DATABASE_ENGINE', default='django.db.backends.sqlite3')
 
 if DATABASE_ENGINE == 'django.db.backends.sqlite3':
+    # TEMPORARY: SQLite optimizations for network drive usage
+    # These settings improve concurrent access and reduce lock contention
+    # REMOVE when migrating to PostgreSQL
     DATABASES = {
         'default': {
             'ENGINE': DATABASE_ENGINE,
             'NAME': BASE_DIR / config('DATABASE_NAME', default='db.sqlite3'),
+            'OPTIONS': {
+                'timeout': 30,  # Wait up to 30 seconds for locks
+                'check_same_thread': False,  # Allow multi-threaded access
+                'init_command': (
+                    'PRAGMA journal_mode=WAL;'  # Write-Ahead Logging for better concurrency
+                    'PRAGMA synchronous=NORMAL;'  # Balance between safety and performance
+                    'PRAGMA cache_size=-64000;'  # 64MB cache
+                    'PRAGMA busy_timeout=30000;'  # 30 second timeout on locks
+                ),
+            }
         }
     }
+    # Disable persistent connections (force fresh connection each request)
+    # This ensures data consistency when using SQLite on network drive
+    CONN_MAX_AGE = 0
 else:
     # PostgreSQL or other database configuration
     DATABASES = {
@@ -97,6 +114,8 @@ else:
             'PORT': config('DATABASE_PORT', default='5432'),
         }
     }
+    # For PostgreSQL, use connection pooling
+    CONN_MAX_AGE = 600  # 10 minutes
 
 
 # Password validation
