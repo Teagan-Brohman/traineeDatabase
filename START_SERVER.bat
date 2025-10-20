@@ -68,7 +68,7 @@ call venv\Scripts\activate.bat
 
 echo [3/6] Checking if server is already running...
 netstat -ano | findstr ":8000" | findstr "LISTENING" >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
+if !ERRORLEVEL! EQU 0 (
     echo.
     echo ===============================================
     echo WARNING: Server already running on port 8000!
@@ -77,7 +77,7 @@ if %ERRORLEVEL% EQU 0 (
     echo A Django server is already running.
     echo.
     echo Options:
-    echo   1. Use the existing server (close this window)
+    echo   1. Use the existing server [close this window]
     echo   2. Stop it first using STOP_SERVER.bat
     echo   3. Close the other START_SERVER.bat window
     echo.
