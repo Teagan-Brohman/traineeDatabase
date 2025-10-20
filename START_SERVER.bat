@@ -50,7 +50,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [1/5] Checking Python version...
+echo [1/6] Checking Python version...
 "%PYTHON_CMD%" --version
 
 REM Check if virtual environment exists
@@ -63,16 +63,36 @@ if not exist "venv\Scripts\activate.bat" (
     exit /b 1
 )
 
-echo [2/5] Activating virtual environment...
+echo [2/6] Activating virtual environment...
 call venv\Scripts\activate.bat
 
-echo [3/5] Running database migrations...
+echo [3/6] Checking if server is already running...
+netstat -ano | findstr ":8000" | findstr "LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    echo.
+    echo ===============================================
+    echo WARNING: Server already running on port 8000!
+    echo ===============================================
+    echo.
+    echo A Django server is already running.
+    echo.
+    echo Options:
+    echo   1. Use the existing server (close this window)
+    echo   2. Stop it first using STOP_SERVER.bat
+    echo   3. Close the other START_SERVER.bat window
+    echo.
+    echo ===============================================
+    pause
+    exit /b 1
+)
+
+echo [4/6] Running database migrations...
 python manage.py migrate --noinput
 
-echo [4/5] Checking for admin user...
+echo [5/6] Checking for admin user...
 python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trainee_tracker.settings'); import django; django.setup(); from django.contrib.auth.models import User; print('Admin exists' if User.objects.filter(is_superuser=True).exists() else 'No admin found')"
 
-echo [5/5] Starting server...
+echo [6/6] Starting server...
 echo.
 echo ===============================================
 echo    SERVER IS STARTING

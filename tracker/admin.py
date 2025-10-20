@@ -31,6 +31,28 @@ class TraineeAdminForm(forms.ModelForm):
             'id': 'id_badge_number',
         })
 
+    def clean_badge_number(self):
+        """Validate badge number format: #YYXX (e.g., #2501, #2523)"""
+        import re
+        from django.core.exceptions import ValidationError
+
+        badge_number = self.cleaned_data.get('badge_number', '').strip()
+
+        # Expected format: #YYXX (e.g., #2501, #2523)
+        # Must start with # followed by exactly 4 digits
+        pattern = r'^#\d{4}$'
+
+        if not badge_number:
+            raise ValidationError('Badge number is required.')
+
+        if not re.match(pattern, badge_number):
+            raise ValidationError(
+                f'Invalid badge number format. Expected format: #YYXX (e.g., #2501, #2523). '
+                f'Must start with # followed by exactly 4 digits.'
+            )
+
+        return badge_number
+
     class Media:
         js = ('admin/js/trainee_badge_suggest.js',)
 
