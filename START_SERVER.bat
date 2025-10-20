@@ -94,13 +94,16 @@ if exist "SERVER_LOCK" (
         echo Previous server: !LOCK_COMPUTER!
         echo Started: !LOCK_STARTED!
         echo.
-        echo This lock is stale ^(^>10 minutes old^).
+        echo This lock is stale - over 10 minutes old.
         echo The previous server likely crashed.
         echo Auto-cleaning and starting new server...
         echo ===============================================
         del SERVER_LOCK
         timeout /t 2 /nobreak >nul
-    ) else if !LOCK_AGE_MINUTES! GTR 5 (
+        goto :lock_check_done
+    )
+
+    if !LOCK_AGE_MINUTES! GTR 5 (
         REM Lock is 5-10 minutes old - might be stale, ask user
         echo.
         echo ===============================================
@@ -119,31 +122,31 @@ if exist "SERVER_LOCK" (
         echo.
         choice /c FX /n /m "Your choice: "
         if errorlevel 2 exit /b 1
-        if errorlevel 1 (
-            echo Forcing unlock...
-            del SERVER_LOCK
-            timeout /t 1 /nobreak >nul
-        )
-    ) else (
-        REM Lock is less than 5 minutes old - definitely active, hard block
-        echo.
-        echo ===============================================
-        echo ERROR: Server already running!
-        echo ===============================================
-        echo Computer: !LOCK_COMPUTER!
-        echo Started: !LOCK_STARTED!
-        echo Last heartbeat: !LOCK_HEARTBEAT!
-        echo Lock age: !LOCK_AGE_MINUTES! minutes
-        echo.
-        echo A server is actively running. Please:
-        echo   1. Use the existing server, OR
-        echo   2. Stop it using STOP_SERVER.bat on !LOCK_COMPUTER!
-        echo.
-        echo ===============================================
-        pause
-        exit /b 1
+        if errorlevel 1 del SERVER_LOCK
+        timeout /t 1 /nobreak >nul
+        goto :lock_check_done
     )
+
+    REM Lock is less than 5 minutes old - definitely active, hard block
+    echo.
+    echo ===============================================
+    echo ERROR: Server already running!
+    echo ===============================================
+    echo Computer: !LOCK_COMPUTER!
+    echo Started: !LOCK_STARTED!
+    echo Last heartbeat: !LOCK_HEARTBEAT!
+    echo Lock age: !LOCK_AGE_MINUTES! minutes
+    echo.
+    echo A server is actively running. Please:
+    echo   1. Use the existing server, OR
+    echo   2. Stop it using STOP_SERVER.bat on !LOCK_COMPUTER!
+    echo.
+    echo ===============================================
+    pause
+    exit /b 1
 )
+
+:lock_check_done
 
 REM Check if port 8000 is in use (additional safety check)
 netstat -ano | findstr ":8000" | findstr "LISTENING" >nul 2>&1
