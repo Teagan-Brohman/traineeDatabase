@@ -136,6 +136,29 @@ def shutdown_server():
     cleanup_and_exit("Idle timeout exceeded")
 
 
+def wait_for_django_startup():
+    """Wait for Django server to start up before monitoring.
+
+    Django takes time to start (loading modules, migrations, etc.),
+    so we need to wait until it's actually running before we start
+    checking if it goes down.
+    """
+    logger.info("Waiting for Django server to start...")
+    max_wait_time = 60  # Wait up to 60 seconds
+    check_interval = 2  # Check every 2 seconds
+
+    for attempt in range(max_wait_time // check_interval):
+        if check_django_running():
+            logger.info(f"Django server detected on port 8000 (after {attempt * check_interval} seconds)")
+            return True
+        time.sleep(check_interval)
+
+    # Django didn't start within timeout
+    logger.warning(f"Django server not detected after {max_wait_time} seconds")
+    logger.warning("Continuing anyway - server may still be starting...")
+    return False
+
+
 def main():
     """Main monitoring loop with two-tier checking.
 
@@ -157,6 +180,10 @@ def main():
     # stale timestamps from previous runs causing immediate shutdown
     initialize_activity_file()
 
+    # Wait for Django to start before beginning monitoring
+    # This prevents false "server not running" detection during startup
+    django_started = wait_for_django_startup()
+
     # Calculate how many fast checks = one idle check
     fast_checks_per_idle_check = CHECK_INTERVAL_SECONDS // FAST_CHECK_INTERVAL
 
@@ -175,8 +202,8 @@ def main():
             if not check_lock_file_exists():
                 cleanup_and_exit("Lock file removed - server stopped externally")
 
-            # Check if Django server is still running
-            if not check_django_running():
+            # Check if Django server is still running (only if it started successfully)
+            if django_started and not check_django_running():
                 cleanup_and_exit("Django server no longer running - window likely closed")
 
             # ========================================

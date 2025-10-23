@@ -340,20 +340,37 @@ The proper solution is migrating to PostgreSQL. However, as a temporary measure,
 **Purpose:** Automatically shutdown server after period of inactivity to release database lock.
 
 **Configuration:**
-- Default timeout: **120 minutes** (2 hours)
-- Check interval: 5 minutes
+- Default timeout: **20 minutes**
+- Idle check interval: 5 minutes (300 seconds)
+- Fast check interval: 3 seconds
 - Configurable via environment variables:
   ```batch
-  set IDLE_TIMEOUT_MINUTES=180
+  set IDLE_TIMEOUT_MINUTES=30
   set CHECK_INTERVAL_SECONDS=300
   ```
 
-**How it works:**
-- Monitors `LAST_ACTIVITY.txt` file updated by Django middleware
-- Calculates idle time since last HTTP request
-- Gracefully shuts down server if idle timeout exceeded
-- Cleans up lock file on shutdown
-- Logs activity to `idle_monitor.log`
+**How it works (Two-Tier Checking System):**
+- **Fast checks (every 3 seconds):**
+  - Monitors if `SERVER_LOCK` file still exists
+  - Checks if Django server is running (port 8000 detection)
+  - Detects forceful window closure within 3 seconds
+  - Exits gracefully if server stops unexpectedly
+
+- **Slow checks (every 5 minutes):**
+  - Monitors `LAST_ACTIVITY.txt` file updated by Django middleware
+  - Calculates idle time since last HTTP request
+  - Gracefully shuts down server if idle timeout exceeded
+  - Logs activity status (ACTIVE/IDLE)
+
+- **Graceful shutdown:**
+  - Cleans up lock file on shutdown
+  - Logs reason for exit
+  - Prevents orphaned processes
+
+**Key Features:**
+- **Stale timestamp prevention:** Initializes `LAST_ACTIVITY.txt` with current time on startup to avoid false timeouts from previous runs
+- **Forceful closure detection:** Detects when START_SERVER.bat window is closed and exits within 3 seconds (instead of lingering as orphaned process)
+- **Port-based monitoring:** Uses socket connection to port 8000 to detect if Django is still running
 
 **Files involved:**
 - `idle_monitor.py` - Python script monitoring activity
@@ -415,11 +432,11 @@ class ActivityTrackerMiddleware:
 [6/6] Starting server...
 Lock file created successfully.
 Starting heartbeat updater...
-Starting idle monitor (timeout: 120 minutes)...
+Starting idle monitor (timeout: 20 minutes)...
 
 TEMPORARY SAFEGUARDS ACTIVE:
 - Server lock prevents multiple instances
-- Auto-shutdown after 120 min of inactivity
+- Auto-shutdown after 20 min of inactivity
 - Heartbeat updates every 60 seconds
 ```
 
@@ -443,23 +460,75 @@ Previous server: WORKSTATION-05
 Auto-cleaning and starting new server...
 ```
 
+#### 5. Server Stop Script (`STOP_SERVER.bat`)
+
+**Purpose:** Gracefully stop Django server and background processes without affecting START_SERVER.bat window.
+
+**How it works:**
+- **Django server detection:** Finds process listening on port 8000 using `netstat`, then kills that specific PID
+- **Heartbeat detection:** Kills PowerShell process by window title filter
+- **Idle monitor detection:** Uses PowerShell with WMI to find python.exe processes running `idle_monitor.py`
+- **Cleanup:** Removes `SERVER_LOCK` and `LAST_ACTIVITY.txt` files
+- **Safe execution:** Uses proper escaping for parentheses and delayed expansion for variables
+
+**Key Improvements:**
+- Uses port-based detection (most reliable for Django server)
+- Uses WMI for command-line filtering (avoids complex batch escaping)
+- Properly escapes parentheses in echo statements when inside if blocks
+- Uses delayed expansion (`!VAR!` instead of `%VAR%`) for correct variable values
+
+**Expected Output:**
+```
+[1/4] Stopping Django server...
+  [OK] Django server stopped (PID: 12345)
+[2/4] Stopping heartbeat updater...
+  [OK] Heartbeat updater stopped
+[3/4] Stopping idle monitor...
+  [OK] Idle monitor stopped
+[4/4] Cleaning up lock files...
+  [OK] Server lock file removed
+  [OK] Activity tracking file removed
+
+SUCCESS: Server and background processes stopped
+```
+
 ### Troubleshooting
 
 **Q: "Database is locked" errors still occurring**
 - Only ONE server should run at a time (check `SERVER_LOCK`)
 - Verify `db.sqlite3` is on network drive (expected behavior)
-- Consider reducing idle timeout to release lock sooner
+- Consider reducing idle timeout to release lock sooner (default is 20 minutes)
 - **Long-term:** Migrate to PostgreSQL
 
 **Q: Server auto-shutdown too frequently**
-- Increase `IDLE_TIMEOUT_MINUTES` in `idle_monitor.py`
+- Increase `IDLE_TIMEOUT_MINUTES` in `idle_monitor.py` (line 29)
 - Check `idle_monitor.log` for activity patterns
-- Note: Idle timeout prevents lock hogging
+- Note: Idle timeout prevents lock hogging and is intentionally conservative
+
+**Q: Idle monitor immediately shuts down server on startup**
+- This was a bug caused by stale `LAST_ACTIVITY.txt` from previous runs
+- **Fixed:** Idle monitor now initializes activity file with current timestamp on startup
+- Delete old `LAST_ACTIVITY.txt` manually if issue persists
+
+**Q: Idle monitor doesn't exit when server window closed**
+- This was a bug where idle monitor only checked every 5 minutes
+- **Fixed:** Now uses fast polling (every 3 seconds) to detect server shutdown
+- Idle monitor will exit within 3 seconds of forceful window closure
 
 **Q: Can't start server - lock file won't clear**
 - Manually delete `SERVER_LOCK` if server definitely not running
 - Check other computers for running servers
 - Run `STOP_SERVER.bat` to force cleanup
+
+**Q: STOP_SERVER.bat shows "was unexpected at this time" error**
+- This was a syntax error in complex FOR/WMIC loops
+- **Fixed:** Simplified to use port-based detection and WMI filtering
+- Update to latest version of STOP_SERVER.bat
+
+**Q: STOP_SERVER.bat doesn't find Django server**
+- Make sure server is actually running on port 8000
+- Check if server was started with `START_SERVER.bat` (not manually)
+- Verify no firewall blocking localhost connections
 
 **Q: Multiple servers started accidentally**
 - Lock detection only works if `START_SERVER.bat` is used
