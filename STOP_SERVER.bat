@@ -30,15 +30,15 @@ set "DJANGO_PID="
 
 :found_django
 if defined DJANGO_PID (
-    taskkill /PID %DJANGO_PID% /F >NUL 2>&1
+    taskkill /PID !DJANGO_PID! /F >NUL 2>&1
     if !ERRORLEVEL! EQU 0 (
-        echo   [OK] Django server stopped (PID: %DJANGO_PID%)
+        echo   [OK] Django server stopped ^(PID: !DJANGO_PID!^)
         set "STOPPED_ANYTHING=1"
     ) else (
-        echo   [!!] Failed to stop Django server (PID: %DJANGO_PID%)
+        echo   [!!] Failed to stop Django server ^(PID: !DJANGO_PID!^)
     )
 ) else (
-    echo   [--] No Django server found (port 8000 not in use)
+    echo   [--] No Django server found ^(port 8000 not in use^)
 )
 
 REM ========================================
@@ -59,7 +59,8 @@ REM ========================================
 echo [3/4] Stopping idle monitor...
 
 REM Use PowerShell with WMI to find and kill idle_monitor.py process
-powershell -Command "$procs = Get-WmiObject Win32_Process -Filter \"name='python.exe'\" | Where-Object { $_.CommandLine -like '*idle_monitor.py*' }; if ($procs) { $procs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; exit 0 } else { exit 1 }" >NUL 2>&1
+REM Avoid complex Filter escaping by using Where-Object for all filtering
+powershell -Command "$found = $false; Get-WmiObject Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*idle_monitor.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $found = $true }; if ($found) { exit 0 } else { exit 1 }" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo   [OK] Idle monitor stopped
     set "STOPPED_ANYTHING=1"
