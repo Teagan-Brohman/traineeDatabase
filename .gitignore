@@ -49,3 +49,7 @@ portable_python/Winpython64*.exe
 
 # Include wheels folder (pre-built packages for offline installation)
 # This is intentionally NOT ignored - wheels should be in the repository
+
+#claude
+CLAUDE.md
+.claude/
