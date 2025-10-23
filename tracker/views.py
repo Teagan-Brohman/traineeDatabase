@@ -155,20 +155,29 @@ def export_cohort_excel(request, cohort_id=None):
         if not isinstance(cell_b, MergedCell):
             cell_b.value = trainee.full_name
 
-        # Get all sign-offs for this trainee
-        signoffs = SignOff.objects.filter(trainee=trainee).values_list('task_id', flat=True)
-        signoff_task_ids = set(signoffs)
+        # Get all sign-offs for this trainee with staff information
+        signoffs = SignOff.objects.filter(trainee=trainee).select_related('signed_by__staff_profile')
+        signoff_dict = {signoff.task_id: signoff for signoff in signoffs}
 
-        # Fill in sign-offs
+        # Fill in sign-offs with staff initials
         for task in tasks:
-            if task.id in signoff_task_ids:
-                # Task is signed off, put "X" in corresponding column
+            if task.id in signoff_dict:
+                signoff = signoff_dict[task.id]
+
+                # Get staff initials, fallback to 'X' if unavailable
+                try:
+                    initials = signoff.signed_by.staff_profile.initials
+                except (AttributeError, Exception):
+                    # Fallback to 'X' if staff profile is missing or other error
+                    initials = 'X'
+
+                # Write initials to corresponding column
                 excel_col = task_column_map.get(task.order)
                 if excel_col:
                     cell = ws.cell(row=current_row, column=excel_col)
                     # Only write if not a merged cell
                     if not isinstance(cell, MergedCell):
-                        cell.value = 'X'
+                        cell.value = initials
                         cell.alignment = Alignment(horizontal='center', vertical='center')
 
         trainees_written += 1
