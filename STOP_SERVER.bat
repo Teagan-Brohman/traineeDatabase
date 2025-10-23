@@ -45,8 +45,12 @@ REM ========================================
 REM Stop heartbeat updater
 REM ========================================
 echo [2/4] Stopping heartbeat updater...
-taskkill /F /FI "WINDOWTITLE eq Heartbeat Updater*" >NUL 2>&1
+
+REM First check if process exists
+tasklist /FI "WINDOWTITLE eq Heartbeat Updater*" 2>NUL | find /I "powershell.exe" >NUL
 if %ERRORLEVEL% EQU 0 (
+    REM Process exists, kill it
+    taskkill /F /FI "WINDOWTITLE eq Heartbeat Updater*" >NUL 2>&1
     echo   [OK] Heartbeat updater stopped
     set "STOPPED_ANYTHING=1"
 ) else (

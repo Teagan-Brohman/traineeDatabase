@@ -434,19 +434,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify(data)
                 });
 
-                const result = await response.json();
+                // Check if response is OK (status 200-299)
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server returned ${response.status}: ${errorText.substring(0, 200)}`);
+                }
+
+                // Try to parse JSON response
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonError) {
+                    const responseText = await response.text();
+                    throw new Error(`Expected JSON response but got: ${responseText.substring(0, 200)}`);
+                }
 
                 if (result.success) {
                     alert(`Success!\n\nCreated: ${result.created}\nUpdated: ${result.updated}\n${result.skipped.length > 0 ? `Skipped: ${result.skipped.length}` : ''}`);
                     document.body.removeChild(modal);
                     location.reload(); // Reload to show updated tasks
                 } else {
-                    alert(`Error: ${result.error}\n\n${result.errors.map(e => `${e.task}: ${e.error}`).join('\n')}`);
+                    // Safely handle errors array that might be undefined
+                    const errorDetails = result.errors && result.errors.length > 0
+                        ? '\n\n' + result.errors.map(e => `${e.task}: ${e.error}`).join('\n')
+                        : '';
+                    alert(`Error: ${result.error}${errorDetails}`);
                     document.getElementById('bulkTaskProgress').style.display = 'none';
                     this.disabled = false;
                 }
             } catch (error) {
-                alert('An error occurred while processing bulk sign-off: ' + error.message);
+                alert('An error occurred while processing bulk sign-off:\n\n' + error.message);
                 document.getElementById('bulkTaskProgress').style.display = 'none';
                 this.disabled = false;
             }
