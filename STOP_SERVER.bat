@@ -54,15 +54,12 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 REM ========================================
-REM Stop idle monitor (using PowerShell)
+REM Stop idle monitor (using PowerShell with WMI)
 REM ========================================
 echo [3/4] Stopping idle monitor...
 
-REM Use PowerShell to find and kill idle_monitor.py process
-powershell -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*idle_monitor.py*' } | ForEach-Object { Stop-Process -Id $_.Id -Force }" >NUL 2>&1
-
-REM Check if any python.exe processes with idle_monitor.py in command line still exist
-powershell -Command "if (Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*idle_monitor.py*' }) { exit 1 } else { exit 0 }" >NUL 2>&1
+REM Use PowerShell with WMI to find and kill idle_monitor.py process
+powershell -Command "$procs = Get-WmiObject Win32_Process -Filter \"name='python.exe'\" | Where-Object { $_.CommandLine -like '*idle_monitor.py*' }; if ($procs) { $procs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; exit 0 } else { exit 1 }" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo   [OK] Idle monitor stopped
     set "STOPPED_ANYTHING=1"

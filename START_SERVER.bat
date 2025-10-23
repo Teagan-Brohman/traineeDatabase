@@ -195,7 +195,7 @@ timeout /t 2 /nobreak >nul
 REM ========================================
 REM Start idle monitor (background)
 REM ========================================
-echo Starting idle monitor (timeout: 120 minutes)...
+echo Starting idle monitor (timeout: 20 minutes)...
 start /min "Idle Monitor" python "%CD%\idle_monitor.py"
 timeout /t 2 /nobreak >nul
 
@@ -219,7 +219,7 @@ echo ===============================================
 echo.
 echo TEMPORARY SAFEGUARDS ACTIVE:
 echo - Server lock prevents multiple instances
-echo - Auto-shutdown after 120 min of inactivity
+echo - Auto-shutdown after 20 min of inactivity
 echo - Heartbeat updates every 60 seconds
 echo ===============================================
 echo.

@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Configuration
-IDLE_TIMEOUT_MINUTES = int(os.environ.get('IDLE_TIMEOUT_MINUTES', '120'))  # 2 hours default
+IDLE_TIMEOUT_MINUTES = int(os.environ.get('IDLE_TIMEOUT_MINUTES', '20'))  # 20 minutes default
 CHECK_INTERVAL_SECONDS = int(os.environ.get('CHECK_INTERVAL_SECONDS', '300'))  # 5 minutes default
 ACTIVITY_FILE = 'LAST_ACTIVITY.txt'
 LOCK_FILE = 'SERVER_LOCK'
