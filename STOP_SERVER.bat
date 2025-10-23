@@ -17,15 +17,28 @@ echo.
 set "STOPPED_ANYTHING=0"
 
 REM ========================================
-REM Stop Django server
+REM Stop Django server (by port 8000)
 REM ========================================
 echo [1/4] Stopping Django server...
-taskkill /F /FI "COMMANDLINE eq *manage.py runserver*" /FI "IMAGENAME eq python.exe" >NUL 2>&1
-if %ERRORLEVEL% EQU 0 (
-    echo   [OK] Django server stopped
-    set "STOPPED_ANYTHING=1"
+
+REM Find PID of process listening on port 8000
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000" ^| findstr "LISTENING"') do (
+    set "DJANGO_PID=%%a"
+    goto :found_django
+)
+set "DJANGO_PID="
+
+:found_django
+if defined DJANGO_PID (
+    taskkill /PID %DJANGO_PID% /F >NUL 2>&1
+    if !ERRORLEVEL! EQU 0 (
+        echo   [OK] Django server stopped (PID: %DJANGO_PID%)
+        set "STOPPED_ANYTHING=1"
+    ) else (
+        echo   [!!] Failed to stop Django server (PID: %DJANGO_PID%)
+    )
 ) else (
-    echo   [--] No Django server found
+    echo   [--] No Django server found (port 8000 not in use)
 )
 
 REM ========================================
@@ -41,10 +54,15 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 REM ========================================
-REM Stop idle monitor
+REM Stop idle monitor (using PowerShell)
 REM ========================================
 echo [3/4] Stopping idle monitor...
-taskkill /F /FI "COMMANDLINE eq *idle_monitor.py*" /FI "IMAGENAME eq python.exe" >NUL 2>&1
+
+REM Use PowerShell to find and kill idle_monitor.py process
+powershell -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*idle_monitor.py*' } | ForEach-Object { Stop-Process -Id $_.Id -Force }" >NUL 2>&1
+
+REM Check if any python.exe processes with idle_monitor.py in command line still exist
+powershell -Command "if (Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*idle_monitor.py*' }) { exit 1 } else { exit 0 }" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo   [OK] Idle monitor stopped
     set "STOPPED_ANYTHING=1"
