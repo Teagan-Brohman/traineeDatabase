@@ -99,20 +99,45 @@ def check_django_running():
 
 
 def cleanup_and_exit(reason="Unknown"):
-    """Clean up lock file and exit gracefully.
+    """Clean up all temporary files and background processes before exiting.
+
+    This function ensures complete cleanup when the idle monitor exits,
+    including removing lock files and stopping the heartbeat updater.
 
     Args:
         reason: String describing why we're exiting
     """
     logger.info(f"Exiting idle monitor: {reason}")
 
-    # Clean up lock file
+    # Clean up SERVER_LOCK file
     try:
         if os.path.exists(LOCK_FILE):
             os.remove(LOCK_FILE)
             logger.info("Removed server lock file")
     except Exception as e:
         logger.error(f"Error removing lock file: {e}")
+
+    # Clean up LAST_ACTIVITY.txt file
+    try:
+        if os.path.exists(ACTIVITY_FILE):
+            os.remove(ACTIVITY_FILE)
+            logger.info("Removed activity tracking file")
+    except Exception as e:
+        logger.error(f"Error removing activity file: {e}")
+
+    # Stop heartbeat updater (PowerShell process)
+    try:
+        import platform
+        if platform.system() == 'Windows':
+            # Kill heartbeat updater by window title
+            result = os.system('taskkill /F /FI "WINDOWTITLE eq Heartbeat Updater*" >nul 2>&1')
+            if result == 0:
+                logger.info("Stopped heartbeat updater")
+        else:
+            # Unix-like systems - kill by process name (if applicable)
+            os.system('pkill -f "heartbeat_updater" 2>/dev/null')
+    except Exception as e:
+        logger.error(f"Error stopping heartbeat updater: {e}")
 
     logger.info("Idle monitor shutdown complete")
     sys.exit(0)
