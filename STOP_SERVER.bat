@@ -1,9 +1,11 @@
 @echo off
+setlocal enabledelayedexpansion
 REM ========================================
 REM Trainee Tracker - Stop Server
 REM ========================================
-REM This script forcefully stops the Django server
-REM Use this if the server window is stuck or unresponsive
+REM This script gracefully stops the Django server
+REM and all background processes (heartbeat, idle monitor)
+REM without affecting the START_SERVER.bat window.
 REM ========================================
 
 echo.
@@ -12,71 +14,84 @@ echo    TRAINEE BADGE TRACKER - Stop Server
 echo ===============================================
 echo.
 
-echo Looking for running Django processes...
-echo.
-
-REM Find and kill Python processes running manage.py
-tasklist /FI "IMAGENAME eq python.exe" 2>NUL | find /I /N "python.exe">NUL
-if "%ERRORLEVEL%"=="0" (
-    echo Found Python processes. Checking for Django server...
-
-    REM Kill processes with manage.py in command line
-    for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO LIST ^| find "PID:"') do (
-        wmic process where "ProcessId=%%a" get CommandLine 2>NUL | find "manage.py runserver" >NUL
-        if not errorlevel 1 (
-            echo Stopping Django server (PID: %%a)...
-            taskkill /PID %%a /F >NUL 2>&1
-            echo Server stopped successfully!
-        )
-    )
-) else (
-    echo No Python processes found.
-    echo The server may already be stopped.
-)
+set "STOPPED_ANYTHING=0"
 
 REM ========================================
-REM TEMPORARY: Cleanup server lock and background processes
+REM Stop Django server
 REM ========================================
-echo.
-echo Cleaning up background processes...
-
-REM Stop heartbeat updater (PowerShell process)
-taskkill /FI "WINDOWTITLE eq Heartbeat Updater*" /F >NUL 2>&1
+echo [1/4] Stopping Django server...
+taskkill /F /FI "COMMANDLINE eq *manage.py runserver*" /FI "IMAGENAME eq python.exe" >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
-    echo - Heartbeat updater stopped
+    echo   [OK] Django server stopped
+    set "STOPPED_ANYTHING=1"
+) else (
+    echo   [--] No Django server found
 )
 
-REM Stop idle monitor (Python process)
-for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO LIST ^| find "PID:"') do (
-    wmic process where "ProcessId=%%a" get CommandLine 2>NUL | find "idle_monitor.py" >NUL
-    if not errorlevel 1 (
-        echo - Idle monitor stopped
-        taskkill /PID %%a /F >NUL 2>&1
-    )
+REM ========================================
+REM Stop heartbeat updater
+REM ========================================
+echo [2/4] Stopping heartbeat updater...
+taskkill /F /FI "WINDOWTITLE eq Heartbeat Updater*" >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo   [OK] Heartbeat updater stopped
+    set "STOPPED_ANYTHING=1"
+) else (
+    echo   [--] No heartbeat updater found
 )
 
-REM Remove server lock file
+REM ========================================
+REM Stop idle monitor
+REM ========================================
+echo [3/4] Stopping idle monitor...
+taskkill /F /FI "COMMANDLINE eq *idle_monitor.py*" /FI "IMAGENAME eq python.exe" >NUL 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo   [OK] Idle monitor stopped
+    set "STOPPED_ANYTHING=1"
+) else (
+    echo   [--] No idle monitor found
+)
+
+REM ========================================
+REM Clean up lock and tracking files
+REM ========================================
+echo [4/4] Cleaning up lock files...
+
+set "CLEANED_FILES=0"
+
 if exist "SERVER_LOCK" (
-    del SERVER_LOCK
-    echo - Server lock file removed
+    del "SERVER_LOCK"
+    echo   [OK] Server lock file removed
+    set "CLEANED_FILES=1"
 )
 
-REM Remove activity tracking file
 if exist "LAST_ACTIVITY.txt" (
-    del LAST_ACTIVITY.txt
-    echo - Activity tracking file removed
+    del "LAST_ACTIVITY.txt"
+    echo   [OK] Activity tracking file removed
+    set "CLEANED_FILES=1"
 )
 
-echo Cleanup complete.
+if "%CLEANED_FILES%"=="0" (
+    echo   [--] No lock files found
+)
 
 echo.
 echo ===============================================
-echo.
-echo If the server is still running:
-echo 1. Find the START_SERVER.bat window
-echo 2. Press Ctrl+C
-echo 3. Or just close the window
-echo.
+
+if "%STOPPED_ANYTHING%"=="1" (
+    echo SUCCESS: Server and background processes stopped
+    echo.
+    echo The START_SERVER.bat window should show:
+    echo   "Server has stopped. Cleaning up lock file..."
+    echo.
+    echo To restart, run START_SERVER.bat again.
+) else (
+    echo NOTICE: No running server found
+    echo.
+    echo The server may already be stopped, or was not
+    echo started using START_SERVER.bat.
+)
+
 echo ===============================================
 echo.
 pause

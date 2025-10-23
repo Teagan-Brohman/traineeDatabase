@@ -44,6 +44,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def initialize_activity_file():
+    """Initialize the activity file with current timestamp.
+
+    This prevents the idle monitor from reading stale timestamps
+    from previous server runs that would cause immediate shutdown.
+    """
+    try:
+        timestamp = datetime.now().isoformat()
+        with open(ACTIVITY_FILE, 'w') as f:
+            f.write(timestamp)
+        logger.info(f"Initialized activity tracking (start time: {timestamp})")
+    except Exception as e:
+        logger.error(f"Error initializing activity file: {e}")
+
+
 def get_last_activity():
     """Read the last activity timestamp from file."""
     try:
@@ -97,6 +112,10 @@ def main():
     logger.info(f"Idle timeout: {IDLE_TIMEOUT_MINUTES} minutes")
     logger.info(f"Check interval: {CHECK_INTERVAL_SECONDS} seconds")
     logger.info("="*60)
+
+    # Initialize activity file with current timestamp to prevent
+    # stale timestamps from previous runs causing immediate shutdown
+    initialize_activity_file()
 
     check_count = 0
 
