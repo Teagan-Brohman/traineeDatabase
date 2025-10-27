@@ -745,6 +745,7 @@ def _export_advanced_excel_internal(request, is_active=True):
     from django.http import HttpResponse
     from openpyxl import load_workbook
     from openpyxl.styles import Alignment
+    from datetime import datetime
     import os
 
     # Load template
