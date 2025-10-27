@@ -1,0 +1,831 @@
+{% extends 'tracker/base.html' %}
+{% load tracker_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>{{ page_title }}</h1>
+    <div class="header-actions">
+        <a href="{% url 'trainee_list' %}" class="btn">Orientation Tracking</a>
+        {% if status_filter == 'removed' %}
+            <a href="{% url 'export_advanced_excel_removed' %}" class="btn btn-success">Export to Excel (Removed)</a>
+        {% else %}
+            <a href="{% url 'export_advanced_excel' %}" class="btn btn-success">Export to Excel (Active)</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="filter-controls">
+    <div class="filter-group">
+        <label for="roleFilter">Role:</label>
+        <select id="roleFilter" class="filter-select">
+            <option value="">All Roles</option>
+            {% for role_code, role_name in role_choices %}
+                <option value="{{ role_code }}" {% if role_filter == role_code %}selected{% endif %}>{{ role_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="statusFilter">Status:</label>
+        <select id="statusFilter" class="filter-select">
+            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
+            <option value="removed" {% if status_filter == 'removed' %}selected{% endif %}>Removed Only</option>
+            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Staff</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="searchBox">Search:</label>
+        <input type="text" id="searchBox" class="search-input" placeholder="Name or badge number...">
+    </div>
+
+    <button id="clearFilters" class="btn btn-secondary">Clear Filters</button>
+</div>
+
+<!-- Training Table -->
+<div class="content">
+    <div class="table-container">
+        <table class="training-table" id="trainingTable">
+            <thead>
+                <tr>
+                    <th class="sticky-col">Badge</th>
+                    <th class="sticky-col">Name</th>
+                    <th class="sticky-col">Role</th>
+                    {% for training_type in training_types %}
+                        <th class="training-col" title="{{ training_type.name }}">
+                            {{ training_type.name }}
+                        </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in staff_progress %}
+                    <tr class="staff-row"
+                        data-badge="{{ item.staff.badge_number }}"
+                        data-name="{{ item.staff.get_full_name|lower }}"
+                        data-role="{{ item.staff.role }}"
+                        data-active="{{ item.staff.is_active|lower }}">
+                        <td class="sticky-col">
+                            <a href="{% url 'advanced_staff_detail' item.staff.badge_number %}">
+                                {{ item.staff.badge_number }}
+                            </a>
+                        </td>
+                        <td class="sticky-col">{{ item.staff.get_full_name }}</td>
+                        <td class="sticky-col">{{ item.staff.get_role_display }}</td>
+                        {% for training_type in training_types %}
+                            <td class="training-cell"
+                                data-staff-id="{{ item.staff.id }}"
+                                data-staff-badge="{{ item.staff.badge_number }}"
+                                data-staff-name="{{ item.staff.get_full_name }}"
+                                data-training-type-id="{{ training_type.id }}"
+                                data-training-type-name="{{ training_type.name }}"
+                                data-allows-custom="{{ training_type.allows_custom_type|lower }}">
+                                {% if training_type.id in item.trainings_by_type %}
+                                    {% for training in item.trainings_by_type|get_item:training_type.id %}
+                                        <div class="training-indicator
+                                            {% if not training.completion_date %}status-none
+                                            {% elif training.is_expired %}status-expired
+                                            {% elif training.is_expiring_soon %}status-expiring
+                                            {% else %}status-current{% endif %}"
+                                            data-training-id="{{ training.id }}"
+                                            data-completion-date="{{ training.completion_date|date:'Y-m-d' }}"
+                                            data-approver="{{ training.approver_initials }}"
+                                            data-termination-date="{{ training.termination_date|date:'Y-m-d' }}"
+                                            data-custom-type="{{ training.custom_type }}"
+                                            data-notes="{{ training.notes }}"
+                                            title="{{ training_type.name }}{% if training.custom_type %} ({{ training.custom_type }}){% endif %}
+Completed: {{ training.completion_date|date:'Y-m-d'|default:'N/A' }}
+Approver: {{ training.approver_initials|default:'N/A' }}
+{% if training.termination_date %}Expires: {{ training.termination_date|date:'Y-m-d' }}{% endif %}
+Click to edit">
+                                            {% if not training.completion_date %}-
+                                            {% elif training.is_expired %}❌
+                                            {% elif training.is_expiring_soon %}⚠️
+                                            {% else %}✓{% endif %}
+                                            <br><small>{{ training.approver_initials }}</small>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="training-indicator status-none" title="Click to add training">
+                                        <span class="add-icon">+</span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="{{ training_types|length|add:3 }}" style="text-align: center; padding: 40px;">
+                            No staff members found.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Training Edit/Add Modal -->
+<div id="trainingModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Edit Training</h2>
+            <button class="modal-close" onclick="closeTrainingModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="trainingForm">
+                <input type="hidden" id="staffId">
+                <input type="hidden" id="trainingTypeId">
+                <input type="hidden" id="trainingId">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Staff:</label>
+                        <input type="text" id="staffDisplay" readonly class="readonly-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Training Type:</label>
+                        <input type="text" id="trainingTypeDisplay" readonly class="readonly-input">
+                    </div>
+                </div>
+
+                <div class="form-group" id="customTypeGroup" style="display: none;">
+                    <label for="customType">Custom Type:</label>
+                    <input type="text" id="customType" placeholder="e.g., Package, Experiment, Waste">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="completionDate">Completion Date: *</label>
+                        <input type="date" id="completionDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="approverInitials">Approver Initials:</label>
+                        <input type="text" id="approverInitials" maxlength="10" placeholder="e.g., TB, AS">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="terminationDate">Termination/Expiration Date:</label>
+                    <input type="date" id="terminationDate">
+                    <small class="form-help">Leave blank if training doesn't expire</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notes:</label>
+                    <textarea id="notes" rows="3" placeholder="Optional notes..."></textarea>
+                </div>
+
+                <div id="formError" class="error-message" style="display: none;"></div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-danger" id="deleteBtn" style="display: none;" onclick="deleteTraining()">Delete</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeTrainingModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Spinner -->
+<div id="loadingSpinner" class="loading-spinner" style="display: none;">
+    <div class="spinner"></div>
+</div>
+
+<style>
+/* Header and Controls */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.filter-controls {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 15px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-group label {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.filter-select, .search-input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.search-input {
+    min-width: 250px;
+}
+
+/* Table Styling */
+.table-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 300px);
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.training-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.training-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #4CAF50;
+}
+
+.training-table th {
+    background-color: #4CAF50;
+    color: white;
+    font-weight: bold;
+    padding: 12px 8px;
+    text-align: left;
+    border: 1px solid #45a049;
+}
+
+.training-table th.sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 11;
+    background-color: #4CAF50;
+}
+
+.training-table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+    text-align: center;
+}
+
+.training-table td.sticky-col {
+    position: sticky;
+    left: 0;
+    background-color: white;
+    z-index: 5;
+    text-align: left;
+}
+
+.training-table tr:nth-child(even) td.sticky-col {
+    background-color: #f2f2f2;
+}
+
+.training-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.training-table tr:hover td {
+    background-color: #e8f5e9;
+}
+
+.training-table tr.filtered-out {
+    display: none;
+}
+
+/* Training Cell Indicators */
+.training-cell {
+    cursor: pointer;
+    position: relative;
+    min-width: 80px;
+}
+
+.training-cell:hover {
+    background-color: #fff3cd !important;
+}
+
+.training-indicator {
+    display: inline-block;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.status-current {
+    color: #28a745;
+    background: #d4edda;
+}
+
+.status-expiring {
+    color: #fd7e14;
+    background: #fff3cd;
+}
+
+.status-expired {
+    color: #dc3545;
+    background: #f8d7da;
+}
+
+.status-none {
+    color: #6c757d;
+    background: #e9ecef;
+}
+
+.add-icon {
+    font-size: 20px;
+    color: #007bff;
+}
+
+/* Modal Styling */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 30px;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.modal-close:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+/* Form Styling */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.readonly-input {
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+}
+
+.form-help {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.error-message {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 10px;
+    border-radius: 3px;
+    margin-bottom: 15px;
+}
+
+/* Button Styling */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-input {
+        min-width: auto;
+    }
+}
+</style>
+
+<script>
+// Global variables
+let currentTrainingData = {};
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Attach click handlers to training cells
+    document.querySelectorAll('.training-cell').forEach(cell => {
+        cell.addEventListener('click', function() {
+            openTrainingModal(this);
+        });
+    });
+
+    // Filter event listeners
+    document.getElementById('roleFilter').addEventListener('change', applyFilters);
+    document.getElementById('statusFilter').addEventListener('change', function() {
+        const role = document.getElementById('roleFilter').value;
+        const status = this.value;
+        window.location.href = `?role=${role}&status=${status}`;
+    });
+    document.getElementById('searchBox').addEventListener('input', applyFilters);
+    document.getElementById('clearFilters').addEventListener('click', clearFilters);
+
+    // Form submission
+    document.getElementById('trainingForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveTraining();
+    });
+
+    // Close modal on overlay click
+    document.getElementById('trainingModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeTrainingModal();
+        }
+    });
+
+    // Escape key to close modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('trainingModal').style.display !== 'none') {
+            closeTrainingModal();
+        }
+    });
+});
+
+// Open training modal
+function openTrainingModal(cell) {
+    const staffId = cell.dataset.staffId;
+    const staffBadge = cell.dataset.staffBadge;
+    const staffName = cell.dataset.staffName;
+    const trainingTypeId = cell.dataset.trainingTypeId;
+    const trainingTypeName = cell.dataset.trainingTypeName;
+    const allowsCustom = cell.dataset.allowsCustom === 'true';
+
+    // Find existing training indicator
+    const indicator = cell.querySelector('.training-indicator[data-training-id]');
+    const isEdit = indicator && indicator.dataset.trainingId;
+
+    // Populate modal
+    document.getElementById('staffId').value = staffId;
+    document.getElementById('trainingTypeId').value = trainingTypeId;
+    document.getElementById('staffDisplay').value = `${staffBadge} - ${staffName}`;
+    document.getElementById('trainingTypeDisplay').value = trainingTypeName;
+
+    // Show/hide custom type field
+    const customTypeGroup = document.getElementById('customTypeGroup');
+    if (allowsCustom) {
+        customTypeGroup.style.display = 'block';
+    } else {
+        customTypeGroup.style.display = 'none';
+    }
+
+    if (isEdit) {
+        // Editing existing training
+        document.getElementById('modalTitle').textContent = 'Edit Training';
+        document.getElementById('trainingId').value = indicator.dataset.trainingId;
+        document.getElementById('completionDate').value = indicator.dataset.completionDate || '';
+        document.getElementById('approverInitials').value = indicator.dataset.approver || '';
+        document.getElementById('terminationDate').value = indicator.dataset.terminationDate || '';
+        document.getElementById('customType').value = indicator.dataset.customType || '';
+        document.getElementById('notes').value = indicator.dataset.notes || '';
+        document.getElementById('deleteBtn').style.display = 'inline-block';
+    } else {
+        // Adding new training
+        document.getElementById('modalTitle').textContent = 'Add Training';
+        document.getElementById('trainingId').value = '';
+        document.getElementById('completionDate').value = '';
+        document.getElementById('approverInitials').value = '';
+        document.getElementById('terminationDate').value = '';
+        document.getElementById('customType').value = '';
+        document.getElementById('notes').value = '';
+        document.getElementById('deleteBtn').style.display = 'none';
+    }
+
+    // Clear error
+    document.getElementById('formError').style.display = 'none';
+
+    // Show modal
+    document.getElementById('trainingModal').style.display = 'flex';
+
+    // Store current cell reference
+    currentTrainingData.cell = cell;
+}
+
+// Close training modal
+function closeTrainingModal() {
+    document.getElementById('trainingModal').style.display = 'none';
+    currentTrainingData = {};
+}
+
+// Save training
+async function saveTraining() {
+    const formError = document.getElementById('formError');
+    formError.style.display = 'none';
+
+    // Gather form data
+    const data = {
+        staff_id: parseInt(document.getElementById('staffId').value),
+        training_type_id: parseInt(document.getElementById('trainingTypeId').value),
+        completion_date: document.getElementById('completionDate').value,
+        approver_initials: document.getElementById('approverInitials').value.trim(),
+        termination_date: document.getElementById('terminationDate').value || null,
+        custom_type: document.getElementById('customType').value.trim(),
+        notes: document.getElementById('notes').value.trim(),
+    };
+
+    // Validation
+    if (!data.completion_date) {
+        formError.textContent = 'Completion date is required.';
+        formError.style.display = 'block';
+        return;
+    }
+
+    // Show loading
+    document.getElementById('loadingSpinner').style.display = 'flex';
+
+    try {
+        const response = await fetch('{% url "update_advanced_training" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Update the cell visually
+            updateCellDisplay(currentTrainingData.cell, result.training, data);
+            closeTrainingModal();
+        } else {
+            formError.textContent = result.error || 'An error occurred while saving.';
+            formError.style.display = 'block';
+        }
+    } catch (error) {
+        formError.textContent = 'Network error: ' + error.message;
+        formError.style.display = 'block';
+    } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+    }
+}
+
+// Update cell display after successful save
+function updateCellDisplay(cell, trainingData, formData) {
+    const trainingId = document.getElementById('trainingId').value;
+
+    // Determine status class
+    let statusClass = 'status-current';
+    let statusIcon = '✓';
+
+    if (!trainingData.completion_date) {
+        statusClass = 'status-none';
+        statusIcon = '-';
+    } else if (trainingData.is_expired) {
+        statusClass = 'status-expired';
+        statusIcon = '❌';
+    } else if (trainingData.is_expiring_soon) {
+        statusClass = 'status-expiring';
+        statusIcon = '⚠️';
+    }
+
+    // Build title
+    const trainingTypeName = cell.dataset.trainingTypeName;
+    let titleText = `${trainingTypeName}`;
+    if (formData.custom_type) {
+        titleText += ` (${formData.custom_type})`;
+    }
+    titleText += `\nCompleted: ${formData.completion_date || 'N/A'}`;
+    titleText += `\nApprover: ${formData.approver_initials || 'N/A'}`;
+    if (formData.termination_date) {
+        titleText += `\nExpires: ${formData.termination_date}`;
+    }
+    titleText += '\nClick to edit';
+
+    // Create new indicator HTML
+    const indicatorHTML = `
+        <div class="training-indicator ${statusClass}"
+            data-training-id="${trainingData.id}"
+            data-completion-date="${formData.completion_date}"
+            data-approver="${formData.approver_initials}"
+            data-termination-date="${formData.termination_date || ''}"
+            data-custom-type="${formData.custom_type}"
+            data-notes="${formData.notes}"
+            title="${titleText}">
+            ${statusIcon}
+            <br><small>${formData.approver_initials}</small>
+        </div>
+    `;
+
+    // Replace cell content
+    cell.innerHTML = indicatorHTML;
+}
+
+// Delete training
+async function deleteTraining() {
+    const trainingId = document.getElementById('trainingId').value;
+
+    if (!trainingId || !confirm('Are you sure you want to delete this training record?')) {
+        return;
+    }
+
+    document.getElementById('loadingSpinner').style.display = 'flex';
+
+    try {
+        const response = await fetch(`{% url 'delete_advanced_training' 0 %}`.replace('/0/', `/${trainingId}/`), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Replace with empty cell
+            currentTrainingData.cell.innerHTML = '<div class="training-indicator status-none" title="Click to add training"><span class="add-icon">+</span></div>';
+            closeTrainingModal();
+        } else {
+            alert('Error deleting training: ' + result.error);
+        }
+    } catch (error) {
+        alert('Network error: ' + error.message);
+    } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+    }
+}
+
+// Apply filters
+function applyFilters() {
+    const roleFilter = document.getElementById('roleFilter').value.toLowerCase();
+    const searchText = document.getElementById('searchBox').value.toLowerCase();
+
+    document.querySelectorAll('.staff-row').forEach(row => {
+        const badge = row.dataset.badge.toLowerCase();
+        const name = row.dataset.name.toLowerCase();
+        const role = row.dataset.role.toLowerCase();
+
+        const roleMatch = !roleFilter || role === roleFilter;
+        const searchMatch = !searchText || name.includes(searchText) || badge.includes(searchText);
+
+        if (roleMatch && searchMatch) {
+            row.classList.remove('filtered-out');
+        } else {
+            row.classList.add('filtered-out');
+        }
+    });
+}
+
+// Clear filters
+function clearFilters() {
+    document.getElementById('roleFilter').value = '';
+    document.getElementById('searchBox').value = '';
+    applyFilters();
+}
+</script>
+
+{% endblock %}

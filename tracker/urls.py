@@ -12,9 +12,12 @@ urlpatterns = [
 
     # Advanced training (must come before <str:badge_number> catch-all)
     path('advanced/', views.advanced_staff_list, name='advanced_staff_list'),
+    path('advanced/main/', views.advanced_staff_main, name='advanced_staff_main'),
     path('advanced/removed/', views.advanced_staff_removed, name='advanced_staff_removed'),
     path('advanced/export/', views.export_advanced_excel, name='export_advanced_excel'),
     path('advanced/export/removed/', views.export_advanced_excel_removed, name='export_advanced_excel_removed'),
+    path('advanced/update-training/', views.update_advanced_training, name='update_advanced_training'),
+    path('advanced/delete-training/<int:training_id>/', views.delete_advanced_training, name='delete_advanced_training'),
     path('advanced/<str:badge_number>/', views.advanced_staff_detail, name='advanced_staff_detail'),
 
     # Trainee detail (catch-all for badge numbers)

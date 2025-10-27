@@ -731,18 +731,318 @@ def advanced_staff_detail(request, badge_number):
 @login_required
 def export_advanced_excel(request):
     """Export active advanced training staff to Excel"""
-    from .models import AdvancedStaff
-    # Placeholder - return simple message for now
-    staff_count = AdvancedStaff.objects.filter(is_active=True).count()
-    messages.info(request, f'Excel export coming soon! ({staff_count} active staff)')
-    return redirect('advanced_staff_list')
+    return _export_advanced_excel_internal(request, is_active=True)
 
 
 @login_required
 def export_advanced_excel_removed(request):
     """Export removed advanced training staff to Excel"""
-    from .models import AdvancedStaff
-    # Placeholder - return simple message for now
-    staff_count = AdvancedStaff.objects.filter(is_active=False).count()
-    messages.info(request, f'Excel export coming soon! ({staff_count} removed staff)')
-    return redirect('advanced_staff_removed')
+    return _export_advanced_excel_internal(request, is_active=False)
+
+
+def _export_advanced_excel_internal(request, is_active=True):
+    """Internal function to export advanced training data to Excel"""
+    from django.http import HttpResponse
+    from openpyxl import load_workbook
+    from openpyxl.styles import Alignment
+    import os
+
+    # Load template
+    template_path = 'ADV_TrainingStatus_WIP.xlsx'
+    if not os.path.exists(template_path):
+        messages.error(request, 'Excel template not found')
+        return redirect('advanced_staff_main')
+
+    wb = load_workbook(template_path)
+
+    # Select appropriate sheet
+    sheet_name = 'ADV' if is_active else 'ADV_Removed'
+    if sheet_name not in wb.sheetnames:
+        messages.error(request, f'Sheet "{sheet_name}" not found in template')
+        return redirect('advanced_staff_main')
+
+    ws = wb[sheet_name]
+
+    # Column mapping (1-indexed)
+    COL_BADGE = 1
+    COL_LAST = 2
+    COL_FIRST = 3
+    COL_ROLE = 4
+    # KP Training: Date(5), Apprvd(6), Term(7)
+    # Escort Training: Date(8), Apprvd(9), Term(10)
+    # ExpSamp Training: Date(11), Apprvd(12), Term(13)
+    # Other Training: Type(14), Date(15), Apprvd(16), Term(17)
+    # Other Training 2: Type(18), Date(19), Apprvd(20), Term(21)
+
+    # Get training types
+    kp_training = AdvancedTrainingType.objects.get(name='KP Training')
+    escort_training = AdvancedTrainingType.objects.get(name='Escort Training')
+    expsamp_training = AdvancedTrainingType.objects.get(name='ExpSamp Training')
+    other_training = AdvancedTrainingType.objects.get(name='Other Training')
+    other_training_2 = AdvancedTrainingType.objects.get(name='Other Training 2')
+
+    # Training type to column mapping
+    training_column_map = {
+        kp_training.id: (5, 6, 7, None),  # (date_col, apprvd_col, term_col, type_col)
+        escort_training.id: (8, 9, 10, None),
+        expsamp_training.id: (11, 12, 13, None),
+        other_training.id: (15, 16, 17, 14),  # Type is in col 14
+        other_training_2.id: (19, 20, 21, 18),  # Type is in col 18
+    }
+
+    # Clear existing data (rows 3 onward, keep headers in rows 1-2)
+    # Delete rows from bottom to top to avoid index shifting
+    max_row = ws.max_row
+    if max_row > 2:
+        ws.delete_rows(3, max_row - 2)
+
+    # Get staff with prefetched training data
+    staff_list = AdvancedStaff.objects.filter(is_active=is_active).prefetch_related('trainings').order_by('badge_number')
+
+    # Write staff data
+    current_row = 3  # Start writing at row 3
+    for staff in staff_list:
+        # Write staff info
+        ws.cell(row=current_row, column=COL_BADGE, value=staff.badge_number)
+        ws.cell(row=current_row, column=COL_LAST, value=staff.last_name)
+        ws.cell(row=current_row, column=COL_FIRST, value=staff.first_name)
+        ws.cell(row=current_row, column=COL_ROLE, value=staff.role)
+
+        # Build training dictionary for quick lookup
+        training_dict = {}
+        for training in staff.trainings.all():
+            # Group by training_type_id and custom_type
+            key = (training.training_type_id, training.custom_type)
+            if key not in training_dict:
+                training_dict[key] = []
+            training_dict[key].append(training)
+
+        # Write training data
+        for training_type_id, (date_col, apprvd_col, term_col, type_col) in training_column_map.items():
+            # For "Other" types, we need to handle custom types
+            if training_type_id == other_training.id:
+                # Get first Other Training record
+                matching = [t for t in staff.trainings.all() if t.training_type_id == training_type_id]
+                if matching:
+                    training = matching[0]
+                    if training.completion_date:
+                        ws.cell(row=current_row, column=date_col, value=training.completion_date.strftime('%m/%d/%Y'))
+                    if training.approver_initials:
+                        ws.cell(row=current_row, column=apprvd_col, value=training.approver_initials)
+                    if training.termination_date:
+                        ws.cell(row=current_row, column=term_col, value=training.termination_date.strftime('%m/%d/%Y'))
+                    if training.custom_type and type_col:
+                        ws.cell(row=current_row, column=type_col, value=training.custom_type)
+
+            elif training_type_id == other_training_2.id:
+                # Get second Other Training record
+                matching = [t for t in staff.trainings.all() if t.training_type_id == other_training.id]
+                if len(matching) > 1:
+                    training = matching[1]
+                    if training.completion_date:
+                        ws.cell(row=current_row, column=date_col, value=training.completion_date.strftime('%m/%d/%Y'))
+                    if training.approver_initials:
+                        ws.cell(row=current_row, column=apprvd_col, value=training.approver_initials)
+                    if training.termination_date:
+                        ws.cell(row=current_row, column=term_col, value=training.termination_date.strftime('%m/%d/%Y'))
+                    if training.custom_type and type_col:
+                        ws.cell(row=current_row, column=type_col, value=training.custom_type)
+            else:
+                # Standard training types (KP, Escort, ExpSamp)
+                matching = [t for t in staff.trainings.all() if t.training_type_id == training_type_id]
+                if matching:
+                    training = matching[0]
+                    if training.completion_date:
+                        ws.cell(row=current_row, column=date_col, value=training.completion_date.strftime('%m/%d/%Y'))
+                    if training.approver_initials:
+                        ws.cell(row=current_row, column=apprvd_col, value=training.approver_initials)
+                    if training.termination_date:
+                        ws.cell(row=current_row, column=term_col, value=training.termination_date.strftime('%m/%d/%Y'))
+
+        current_row += 1
+
+    # Prepare response
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    filename = f'ADV_TrainingStatus_{"Active" if is_active else "Removed"}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    # Save workbook to response
+    wb.save(response)
+
+    return response
+
+
+@login_required
+def advanced_staff_main(request):
+    """
+    Main full-featured advanced training page with inline editing, filtering, and search.
+    Similar to trainee_list but for advanced training staff.
+    """
+    from .models import AdvancedStaff, AdvancedTrainingType
+    from django.db.models import Prefetch
+
+    # Get filter parameters
+    role_filter = request.GET.get('role', '')
+    status_filter = request.GET.get('status', 'active')  # active, removed, all
+
+    # Base queryset
+    if status_filter == 'removed':
+        staff_qs = AdvancedStaff.objects.filter(is_active=False)
+    elif status_filter == 'all':
+        staff_qs = AdvancedStaff.objects.all()
+    else:  # active
+        staff_qs = AdvancedStaff.objects.filter(is_active=True)
+
+    # Apply role filter if specified
+    if role_filter:
+        staff_qs = staff_qs.filter(role=role_filter)
+
+    # Prefetch trainings for efficiency
+    staff_list = staff_qs.prefetch_related(
+        Prefetch('trainings', queryset=AdvancedTraining.objects.select_related('training_type'))
+    ).order_by('badge_number')
+
+    # Get all training types for table headers
+    training_types = AdvancedTrainingType.objects.filter(is_active=True).order_by('order')
+
+    # Build progress data for each staff member
+    staff_progress = []
+    for staff in staff_list:
+        # Organize trainings by type ID
+        trainings_by_type = {}
+        for training in staff.trainings.all():
+            type_id = training.training_type.id
+            if type_id not in trainings_by_type:
+                trainings_by_type[type_id] = []
+            trainings_by_type[type_id].append(training)
+
+        staff_progress.append({
+            'staff': staff,
+            'trainings_by_type': trainings_by_type
+        })
+
+    # Get all roles for filter dropdown
+    role_choices = AdvancedStaff.ROLE_CHOICES
+
+    context = {
+        'staff_progress': staff_progress,
+        'training_types': training_types,
+        'role_choices': role_choices,
+        'role_filter': role_filter,
+        'status_filter': status_filter,
+        'page_title': 'Advanced Training Management',
+    }
+    return render(request, 'tracker/advanced_staff_main.html', context)
+
+
+@login_required
+def update_advanced_training(request):
+    """
+    AJAX endpoint to add or update an advanced training record.
+
+    POST data (JSON):
+    {
+        "staff_id": 123,
+        "training_type_id": 1,
+        "custom_type": "Package",  // optional
+        "completion_date": "2025-01-15",
+        "approver_initials": "TB",
+        "termination_date": "2026-01-15",  // optional
+        "notes": "Additional info"
+    }
+    """
+    from django.http import JsonResponse
+    from .models import AdvancedStaff, AdvancedTrainingType, AdvancedTraining
+    from datetime import datetime
+    import json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    # Validate required fields
+    staff_id = data.get('staff_id')
+    training_type_id = data.get('training_type_id')
+
+    if not staff_id or not training_type_id:
+        return JsonResponse({'success': False, 'error': 'staff_id and training_type_id are required'}, status=400)
+
+    try:
+        staff = AdvancedStaff.objects.get(id=staff_id)
+        training_type = AdvancedTrainingType.objects.get(id=training_type_id)
+    except (AdvancedStaff.DoesNotExist, AdvancedTrainingType.DoesNotExist) as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=404)
+
+    # Parse dates
+    completion_date = None
+    if data.get('completion_date'):
+        try:
+            completion_date = datetime.strptime(data['completion_date'], '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid completion_date format (use YYYY-MM-DD)'}, status=400)
+
+    termination_date = None
+    if data.get('termination_date'):
+        try:
+            termination_date = datetime.strptime(data['termination_date'], '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid termination_date format (use YYYY-MM-DD)'}, status=400)
+
+    # Validate termination date is after completion date
+    if completion_date and termination_date and termination_date <= completion_date:
+        return JsonResponse({'success': False, 'error': 'Termination date must be after completion date'}, status=400)
+
+    custom_type = data.get('custom_type', '').strip()
+    approver_initials = data.get('approver_initials', '').strip()
+    notes = data.get('notes', '').strip()
+
+    # Create or update training record
+    training, created = AdvancedTraining.objects.update_or_create(
+        staff=staff,
+        training_type=training_type,
+        custom_type=custom_type,
+        defaults={
+            'completion_date': completion_date,
+            'approver_initials': approver_initials,
+            'termination_date': termination_date,
+            'notes': notes,
+        }
+    )
+
+    return JsonResponse({
+        'success': True,
+        'created': created,
+        'training': {
+            'id': training.id,
+            'completion_date': training.completion_date.isoformat() if training.completion_date else None,
+            'approver_initials': training.approver_initials,
+            'termination_date': training.termination_date.isoformat() if training.termination_date else None,
+            'is_expired': training.is_expired,
+            'is_expiring_soon': training.is_expiring_soon(),
+        }
+    })
+
+
+@login_required
+def delete_advanced_training(request, training_id):
+    """AJAX endpoint to delete an advanced training record"""
+    from django.http import JsonResponse
+    from .models import AdvancedTraining
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    try:
+        training = AdvancedTraining.objects.get(id=training_id)
+        training.delete()
+        return JsonResponse({'success': True})
+    except AdvancedTraining.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Training record not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

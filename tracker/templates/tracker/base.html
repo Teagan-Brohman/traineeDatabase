@@ -451,6 +451,44 @@
         .score-input {
             max-width: 200px;
         }
+
+        /* Navigation Styles */
+        .main-nav {
+            background: #34495e;
+            border-bottom: 3px solid #2c3e50;
+            margin-bottom: 0;
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            gap: 0;
+        }
+
+        .nav-link {
+            display: inline-block;
+            padding: 15px 25px;
+            color: #ecf0f1;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s;
+            border-bottom: 3px solid transparent;
+            position: relative;
+            top: 3px;
+        }
+
+        .nav-link:hover {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .nav-link.active {
+            background: #2c3e50;
+            color: white;
+            border-bottom-color: #3498db;
+        }
     </style>
 </head>
 <body>
@@ -466,6 +504,20 @@
             </div>
         </div>
     </header>
+
+    <nav class="main-nav">
+        <div class="nav-content">
+            <a href="{% url 'trainee_list' %}" class="nav-link {% if request.resolver_match.url_name == 'trainee_list' %}active{% endif %}">
+                Orientation Tracking
+            </a>
+            <a href="{% url 'advanced_staff_main' %}" class="nav-link {% if 'advanced' in request.path %}active{% endif %}">
+                Advanced Training
+            </a>
+            <a href="{% url 'archive_list' %}" class="nav-link {% if 'archive' in request.path %}active{% endif %}">
+                Archives
+            </a>
+        </div>
+    </nav>
 
     <div class="container">
         {% if messages %}
