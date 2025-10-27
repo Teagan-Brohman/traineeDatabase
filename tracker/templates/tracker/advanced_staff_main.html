@@ -733,31 +733,31 @@ function updateCellDisplay(cell, trainingData, formData) {
         statusIcon = '⚠️';
     }
 
-    // Build title
+    // Build title (use trainingData for approver_initials from server)
     const trainingTypeName = cell.dataset.trainingTypeName;
     let titleText = `${trainingTypeName}`;
     if (formData.custom_type) {
         titleText += ` (${formData.custom_type})`;
     }
     titleText += `\nCompleted: ${formData.completion_date || 'N/A'}`;
-    titleText += `\nApprover: ${formData.approver_initials || 'N/A'}`;
+    titleText += `\nApprover: ${trainingData.approver_initials || 'N/A'}`;
     if (formData.termination_date) {
         titleText += `\nExpires: ${formData.termination_date}`;
     }
     titleText += '\nClick to edit';
 
-    // Create new indicator HTML
+    // Create new indicator HTML (use trainingData for approver_initials from server)
     const indicatorHTML = `
         <div class="training-indicator ${statusClass}"
             data-training-id="${trainingData.id}"
             data-completion-date="${formData.completion_date}"
-            data-approver="${formData.approver_initials}"
+            data-approver="${trainingData.approver_initials}"
             data-termination-date="${formData.termination_date || ''}"
             data-custom-type="${formData.custom_type}"
             data-notes="${formData.notes}"
             title="${titleText}">
             ${statusIcon}
-            <br><small>${formData.approver_initials}</small>
+            <br><small>${trainingData.approver_initials}</small>
         </div>
     `;
 
