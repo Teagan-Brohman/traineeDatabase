@@ -14,11 +14,6 @@
     {% else %}
         <h2>Active Trainees{% if current_cohort %} - {{ current_cohort.name }}{% endif %}</h2>
         <p>Click on a trainee to view detailed progress and sign off tasks.</p>
-        {% if current_cohort %}
-        <div style="margin-top: 15px;">
-            <a href="{% url 'archive_list' %}" class="btn">View Archives</a>
-        </div>
-        {% endif %}
     {% endif %}
 </div>
 

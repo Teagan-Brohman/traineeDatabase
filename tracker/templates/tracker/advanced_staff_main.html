@@ -7,7 +7,6 @@
 <div class="header">
     <h1>{{ page_title }}</h1>
     <div class="header-actions">
-        <a href="{% url 'trainee_list' %}" class="btn">Orientation Tracking</a>
         {% if status_filter == 'removed' %}
             <a href="{% url 'export_advanced_excel_removed' %}" class="btn btn-success">Export to Excel (Removed)</a>
         {% else %}
