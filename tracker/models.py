@@ -363,6 +363,12 @@ class AdvancedTraining(models.Model):
         blank=True,
         help_text="Initials of staff who approved (e.g., 'ET', 'AS')"
     )
+    signed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date and time when training was signed off in the system"
+    )
     termination_date = models.DateField(
         null=True,
         blank=True,

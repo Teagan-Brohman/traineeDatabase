@@ -379,13 +379,13 @@ class AdvancedTrainingTypeAdmin(admin.ModelAdmin):
 
 @admin.register(AdvancedTraining)
 class AdvancedTrainingAdmin(admin.ModelAdmin):
-    list_display = ('staff', 'training_type', 'completion_date', 'approver_initials',
+    list_display = ('staff', 'training_type', 'completion_date', 'approver_initials', 'signed_at',
                     'termination_date', 'custom_type', 'status_display')
-    list_filter = ('training_type', 'staff__role', 'staff__is_active', 'completion_date', 'termination_date')
+    list_filter = ('training_type', 'staff__role', 'staff__is_active', 'completion_date', 'signed_at', 'termination_date')
     search_fields = ('staff__badge_number', 'staff__first_name', 'staff__last_name',
                      'approver_initials', 'custom_type')
     date_hierarchy = 'completion_date'
-    ordering = ('-completion_date',)
+    ordering = ('-signed_at',)
     autocomplete_fields = ['staff', 'training_type']
 
     fieldsets = (
@@ -393,7 +393,7 @@ class AdvancedTrainingAdmin(admin.ModelAdmin):
             'fields': ('staff', 'training_type', 'custom_type')
         }),
         ('Completion Details', {
-            'fields': ('completion_date', 'approver_initials', 'termination_date')
+            'fields': ('completion_date', 'approver_initials', 'signed_at', 'termination_date')
         }),
         ('Additional Information', {
             'fields': ('notes',),

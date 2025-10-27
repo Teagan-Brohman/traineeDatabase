@@ -1026,6 +1026,10 @@ def update_advanced_training(request):
         # User doesn't have a staff profile, use username as fallback
         approver_initials = request.user.username[:10]
 
+    # Get current timestamp for signed_at
+    from django.utils import timezone
+    signed_at = timezone.now()
+
     # Create or update training record
     training, created = AdvancedTraining.objects.update_or_create(
         staff=staff,
@@ -1034,6 +1038,7 @@ def update_advanced_training(request):
         defaults={
             'completion_date': completion_date,
             'approver_initials': approver_initials,
+            'signed_at': signed_at,
             'termination_date': termination_date,
             'notes': notes,
         }
@@ -1046,6 +1051,7 @@ def update_advanced_training(request):
             'id': training.id,
             'completion_date': training.completion_date.isoformat() if training.completion_date else None,
             'approver_initials': training.approver_initials,
+            'signed_at': training.signed_at.isoformat() if training.signed_at else None,
             'termination_date': training.termination_date.isoformat() if training.termination_date else None,
             'is_expired': training.is_expired,
             'is_expiring_soon': training.is_expiring_soon(),
