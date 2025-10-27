@@ -394,7 +394,6 @@ class AdvancedTraining(models.Model):
         from datetime import date
         return date.today() > self.termination_date
 
-    @property
     def is_expiring_soon(self, days=30):
         """Check if training expires within specified days"""
         if not self.termination_date or not self.completion_date:

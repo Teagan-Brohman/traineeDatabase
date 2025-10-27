@@ -164,7 +164,8 @@ Click to edit">
                     </div>
                     <div class="form-group">
                         <label for="approverInitials">Approver Initials:</label>
-                        <input type="text" id="approverInitials" maxlength="10" placeholder="e.g., TB, AS">
+                        <input type="text" id="approverInitials" value="{{ user_initials }}" readonly style="background-color: #f0f0f0; cursor: not-allowed;">
+                        <small class="form-help">Auto-filled with your initials</small>
                     </div>
                 </div>
 
@@ -627,7 +628,7 @@ function openTrainingModal(cell) {
         document.getElementById('modalTitle').textContent = 'Edit Training';
         document.getElementById('trainingId').value = indicator.dataset.trainingId;
         document.getElementById('completionDate').value = indicator.dataset.completionDate || '';
-        document.getElementById('approverInitials').value = indicator.dataset.approver || '';
+        // approverInitials field is read-only and always shows current user's initials
         document.getElementById('terminationDate').value = indicator.dataset.terminationDate || '';
         document.getElementById('customType').value = indicator.dataset.customType || '';
         document.getElementById('notes').value = indicator.dataset.notes || '';
@@ -637,7 +638,7 @@ function openTrainingModal(cell) {
         document.getElementById('modalTitle').textContent = 'Add Training';
         document.getElementById('trainingId').value = '';
         document.getElementById('completionDate').value = '';
-        document.getElementById('approverInitials').value = '';
+        // approverInitials field is read-only and always shows current user's initials
         document.getElementById('terminationDate').value = '';
         document.getElementById('customType').value = '';
         document.getElementById('notes').value = '';
@@ -665,12 +666,11 @@ async function saveTraining() {
     const formError = document.getElementById('formError');
     formError.style.display = 'none';
 
-    // Gather form data
+    // Gather form data (approver_initials auto-populated by backend from logged-in user)
     const data = {
         staff_id: parseInt(document.getElementById('staffId').value),
         training_type_id: parseInt(document.getElementById('trainingTypeId').value),
         completion_date: document.getElementById('completionDate').value,
-        approver_initials: document.getElementById('approverInitials').value.trim(),
         termination_date: document.getElementById('terminationDate').value || null,
         custom_type: document.getElementById('customType').value.trim(),
         notes: document.getElementById('notes').value.trim(),

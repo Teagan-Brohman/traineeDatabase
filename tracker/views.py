@@ -927,6 +927,13 @@ def advanced_staff_main(request):
     # Get all roles for filter dropdown
     role_choices = AdvancedStaff.ROLE_CHOICES
 
+    # Get current user's initials for auto-populating approver field
+    user_initials = ''
+    try:
+        user_initials = request.user.staff_profile.initials
+    except AttributeError:
+        user_initials = request.user.username[:10]
+
     context = {
         'staff_progress': staff_progress,
         'training_types': training_types,
@@ -934,6 +941,7 @@ def advanced_staff_main(request):
         'role_filter': role_filter,
         'status_filter': status_filter,
         'page_title': 'Advanced Training Management',
+        'user_initials': user_initials,
     }
     return render(request, 'tracker/advanced_staff_main.html', context)
 
@@ -1000,8 +1008,15 @@ def update_advanced_training(request):
         return JsonResponse({'success': False, 'error': 'Termination date must be after completion date'}, status=400)
 
     custom_type = data.get('custom_type', '').strip()
-    approver_initials = data.get('approver_initials', '').strip()
     notes = data.get('notes', '').strip()
+
+    # Auto-populate approver initials from current user's staff profile
+    approver_initials = ''
+    try:
+        approver_initials = request.user.staff_profile.initials
+    except AttributeError:
+        # User doesn't have a staff profile, use username as fallback
+        approver_initials = request.user.username[:10]
 
     # Create or update training record
     training, created = AdvancedTraining.objects.update_or_create(
