@@ -746,6 +746,7 @@ def _export_advanced_excel_internal(request, is_active=True):
     from openpyxl import load_workbook
     from openpyxl.styles import Alignment
     from datetime import datetime
+    from .models import AdvancedStaff, AdvancedTrainingType
     import os
 
     # Load template
