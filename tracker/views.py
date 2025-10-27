@@ -989,6 +989,13 @@ def update_advanced_training(request):
     except (AdvancedStaff.DoesNotExist, AdvancedTrainingType.DoesNotExist) as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=404)
 
+    # Check if user is authorized to sign off this training type
+    if not training_type.can_user_sign_off(request.user):
+        return JsonResponse({
+            'success': False,
+            'error': f'You are not authorized to sign off "{training_type.name}". Please contact an administrator.'
+        }, status=403)
+
     # Parse dates
     completion_date = None
     if data.get('completion_date'):

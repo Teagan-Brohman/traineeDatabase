@@ -311,6 +311,12 @@ class AdvancedTrainingType(models.Model):
         help_text="True for 'Other Training' categories that have custom type field"
     )
     is_active = models.BooleanField(default=True)
+    authorized_signers = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='authorized_advanced_training_types',
+        help_text="Specific staff members authorized to sign off this training type. Leave empty to allow all staff."
+    )
 
     class Meta:
         ordering = ['order', 'name']
@@ -319,6 +325,14 @@ class AdvancedTrainingType(models.Model):
 
     def __str__(self):
         return self.name
+
+    def can_user_sign_off(self, user):
+        """Check if a user is authorized to sign off this training type"""
+        # If no specific signers are set, any authenticated staff can sign off
+        if not self.authorized_signers.exists():
+            return True
+        # Otherwise, check if user is in the authorized list
+        return self.authorized_signers.filter(id=user.id).exists()
 
 
 class AdvancedTraining(models.Model):

@@ -344,14 +344,19 @@ class AdvancedStaffAdmin(admin.ModelAdmin):
 
 @admin.register(AdvancedTrainingType)
 class AdvancedTrainingTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'order', 'allows_custom_type', 'is_active', 'training_count')
+    list_display = ('name', 'order', 'allows_custom_type', 'is_active', 'training_count', 'authorized_signers_count')
     list_filter = ('is_active', 'allows_custom_type')
     search_fields = ('name',)
     ordering = ('order', 'name')
+    filter_horizontal = ('authorized_signers',)
 
     fieldsets = (
         (None, {
             'fields': ('name', 'order', 'allows_custom_type', 'is_active')
+        }),
+        ('Authorization', {
+            'fields': ('authorized_signers',),
+            'description': 'Select specific staff members who can sign off this training type. Leave empty to allow all staff.'
         }),
     )
 
@@ -360,9 +365,16 @@ class AdvancedTrainingTypeAdmin(admin.ModelAdmin):
         return f"{count} completed"
     training_count.short_description = 'Completion Count'
 
+    def authorized_signers_count(self, obj):
+        count = obj.authorized_signers.count()
+        if count == 0:
+            return "All staff"
+        return f"{count} staff"
+    authorized_signers_count.short_description = 'Authorized Signers'
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.prefetch_related('trainings')
+        return qs.prefetch_related('trainings', 'authorized_signers')
 
 
 @admin.register(AdvancedTraining)
