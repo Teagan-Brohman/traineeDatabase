@@ -1,0 +1,110 @@
+{% extends 'tracker/base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>{{ staff.get_full_name }} ({{ staff.badge_number }})</h1>
+    <div class="header-actions">
+        {% if staff.is_active %}
+            <a href="{% url 'advanced_staff_list' %}" class="btn">Back to Active Staff</a>
+        {% else %}
+            <a href="{% url 'advanced_staff_removed' %}" class="btn">Back to Removed Staff</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="content">
+    <div class="staff-info">
+        <p><strong>Role:</strong> {{ staff.get_role_display }}</p>
+        <p><strong>Status:</strong> {% if staff.is_active %}Active{% else %}Removed{% endif %}</p>
+    </div>
+
+    <h2>Training Records</h2>
+    <table class="training-table">
+        <thead>
+            <tr>
+                <th>Training Type</th>
+                <th>Custom Type</th>
+                <th>Completion Date</th>
+                <th>Approver</th>
+                <th>Termination Date</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in training_progress %}
+                <tr>
+                    <td>{{ item.training_type.name }}</td>
+                    <td>{{ item.custom_type|default:"-" }}</td>
+                    {% if item.training %}
+                        <td>{{ item.training.completion_date|date:"Y-m-d"|default:"-" }}</td>
+                        <td>{{ item.training.approver_initials|default:"-" }}</td>
+                        <td>{{ item.training.termination_date|date:"Y-m-d"|default:"-" }}</td>
+                        <td>
+                            {% if not item.training.completion_date %}
+                                <span class="status-not-completed">Not Completed</span>
+                            {% elif item.training.is_expired %}
+                                <span class="status-expired">❌ Expired</span>
+                            {% elif item.training.is_expiring_soon %}
+                                <span class="status-expiring">⚠️ Expiring Soon</span>
+                            {% else %}
+                                <span class="status-current">✓ Current</span>
+                            {% endif %}
+                        </td>
+                    {% else %}
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td><span class="status-not-completed">Not Completed</span></td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p style="margin-top: 20px;"><em>Note: To edit training records, use the <a href="/admin/tracker/advancedstaff/{{ staff.id }}/change/">admin interface</a>.</em></p>
+</div>
+
+<style>
+    .staff-info {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .training-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    .training-table th,
+    .training-table td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+    }
+    .training-table th {
+        background-color: #4CAF50;
+        color: white;
+    }
+    .training-table tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+    .status-current {
+        color: green;
+        font-weight: bold;
+    }
+    .status-expiring {
+        color: orange;
+        font-weight: bold;
+    }
+    .status-expired {
+        color: red;
+        font-weight: bold;
+    }
+    .status-not-completed {
+        color: #999;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends 'tracker/base.html' %}
+{% load tracker_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>{{ page_title }}</h1>
+    <div class="header-actions">
+        {% if not is_removed %}
+            <a href="{% url 'advanced_staff_removed' %}" class="btn">View Removed Staff</a>
+            <a href="{% url 'export_advanced_excel' %}" class="btn">Export to Excel</a>
+        {% else %}
+            <a href="{% url 'advanced_staff_list' %}" class="btn">View Active Staff</a>
+            <a href="{% url 'export_advanced_excel_removed' %}" class="btn">Export to Excel</a>
+        {% endif %}
+        <a href="{% url 'trainee_list' %}" class="btn">Back to Orientation Tracking</a>
+    </div>
+</div>
+
+<div class="content">
+    <table class="trainee-table">
+        <thead>
+            <tr>
+                <th>Badge</th>
+                <th>Name</th>
+                <th>Role</th>
+                {% for training_type in training_types %}
+                    <th>{{ training_type.name }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in staff_progress %}
+                <tr>
+                    <td>
+                        <a href="{% url 'advanced_staff_detail' item.staff.badge_number %}">
+                            {{ item.staff.badge_number }}
+                        </a>
+                    </td>
+                    <td>{{ item.staff.get_full_name }}</td>
+                    <td>{{ item.staff.get_role_display }}</td>
+                    {% for training_type in training_types %}
+                        <td style="text-align: center;">
+                            {% if training_type.id in item.trainings_dict %}
+                                {% for training in item.trainings_dict|get_item:training_type.id %}
+                                    {% if training.completion_date %}
+                                        <span title="{{ training_type.name }}: {{ training.completion_date }} by {{ training.approver_initials }}{% if training.termination_date %}, expires {{ training.termination_date }}{% endif %}">
+                                            {% if training.is_expired %}
+                                                ❌
+                                            {% elif training.is_expiring_soon %}
+                                                ⚠️
+                                            {% else %}
+                                                ✓
+                                            {% endif %}
+                                            {{ training.approver_initials }}
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="{{ training_types|length|add:3 }}" style="text-align: center; padding: 40px;">
+                        No staff members found.
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .header-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .trainee-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    .trainee-table th,
+    .trainee-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+    .trainee-table th {
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+    }
+    .trainee-table tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+    .trainee-table tr:hover {
+        background-color: #ddd;
+    }
+</style>
+{% endblock %}

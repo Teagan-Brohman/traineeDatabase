@@ -605,3 +605,144 @@ def bulk_sign_off(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
     return JsonResponse(results)
+
+
+# ============================================================================
+# Advanced Training Views
+# ============================================================================
+
+@login_required
+def advanced_staff_list(request):
+    """List all active advanced training staff"""
+    from .models import AdvancedStaff, AdvancedTrainingType
+
+    # Get all active staff
+    staff_list = AdvancedStaff.objects.filter(is_active=True).prefetch_related('trainings', 'trainings__training_type')
+
+    # Get all training types for table headers
+    training_types = AdvancedTrainingType.objects.filter(is_active=True).order_by('order')
+
+    # Build progress data for each staff member
+    staff_progress = []
+    for staff in staff_list:
+        # Get all trainings for this staff member
+        trainings_dict = {}
+        for training in staff.trainings.all():
+            key = training.training_type.id
+            if key not in trainings_dict:
+                trainings_dict[key] = []
+            trainings_dict[key].append(training)
+
+        staff_progress.append({
+            'staff': staff,
+            'trainings_dict': trainings_dict
+        })
+
+    context = {
+        'staff_progress': staff_progress,
+        'training_types': training_types,
+        'page_title': 'Advanced Training - Active Staff',
+    }
+    return render(request, 'tracker/advanced_staff_list.html', context)
+
+
+@login_required
+def advanced_staff_removed(request):
+    """List all removed advanced training staff"""
+    from .models import AdvancedStaff, AdvancedTrainingType
+
+    # Get all removed staff
+    staff_list = AdvancedStaff.objects.filter(is_active=False).prefetch_related('trainings', 'trainings__training_type')
+
+    # Get all training types for table headers
+    training_types = AdvancedTrainingType.objects.filter(is_active=True).order_by('order')
+
+    # Build progress data for each staff member
+    staff_progress = []
+    for staff in staff_list:
+        # Get all trainings for this staff member
+        trainings_dict = {}
+        for training in staff.trainings.all():
+            key = training.training_type.id
+            if key not in trainings_dict:
+                trainings_dict[key] = []
+            trainings_dict[key].append(training)
+
+        staff_progress.append({
+            'staff': staff,
+            'trainings_dict': trainings_dict
+        })
+
+    context = {
+        'staff_progress': staff_progress,
+        'training_types': training_types,
+        'page_title': 'Advanced Training - Removed Staff',
+        'is_removed': True,
+    }
+    return render(request, 'tracker/advanced_staff_list.html', context)
+
+
+@login_required
+def advanced_staff_detail(request, badge_number):
+    """Detail view for one staff member's advanced training"""
+    from .models import AdvancedStaff, AdvancedTrainingType
+
+    staff = get_object_or_404(AdvancedStaff, badge_number=badge_number)
+
+    # Get all training types
+    training_types = AdvancedTrainingType.objects.filter(is_active=True).order_by('order')
+
+    # Get all trainings for this staff member, organized by type
+    trainings_by_type = {}
+    for training in staff.trainings.all():
+        key = (training.training_type.id, training.custom_type)
+        trainings_by_type[key] = training
+
+    # Build training progress list
+    training_progress = []
+    for training_type in training_types:
+        if training_type.allows_custom_type:
+            # For "Other Training" types, show all existing custom trainings
+            custom_trainings = staff.trainings.filter(training_type=training_type)
+            for training in custom_trainings:
+                training_progress.append({
+                    'training_type': training_type,
+                    'training': training,
+                    'custom_type': training.custom_type,
+                })
+        else:
+            # Regular training type
+            key = (training_type.id, '')
+            training = trainings_by_type.get(key)
+            training_progress.append({
+                'training_type': training_type,
+                'training': training,
+                'custom_type': '',
+            })
+
+    context = {
+        'staff': staff,
+        'training_progress': training_progress,
+        'page_title': f'Advanced Training - {staff.get_full_name()}',
+    }
+    return render(request, 'tracker/advanced_staff_detail.html', context)
+
+
+@login_required
+def export_advanced_excel(request):
+    """Export active advanced training staff to Excel"""
+    from .models import AdvancedStaff
+    # Placeholder - return simple message for now
+    staff_count = AdvancedStaff.objects.filter(is_active=True).count()
+    messages.info(request, f'Excel export coming soon! ({staff_count} active staff)')
+    return redirect('advanced_staff_list')
+
+
+@login_required
+def export_advanced_excel_removed(request):
+    """Export removed advanced training staff to Excel"""
+    from .models import AdvancedStaff
+    # Placeholder - return simple message for now
+    staff_count = AdvancedStaff.objects.filter(is_active=False).count()
+    messages.info(request, f'Excel export coming soon! ({staff_count} removed staff)')
+    return redirect('advanced_staff_removed')

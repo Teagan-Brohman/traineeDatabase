@@ -3,7 +3,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django import forms
 from django.db import models
-from .models import Trainee, Task, SignOff, StaffProfile, UnsignLog, Cohort
+from .models import (Trainee, Task, SignOff, StaffProfile, UnsignLog, Cohort,
+                     AdvancedStaff, AdvancedTrainingType, AdvancedTraining)
 
 class SignOffInline(admin.TabularInline):
     model = SignOff
@@ -298,3 +299,107 @@ admin.site.register(User, UserAdmin)
 admin.site.site_header = "Trainee Badge Tracker Administration"
 admin.site.site_title = "Trainee Tracker"
 admin.site.index_title = "Welcome to Trainee Badge Tracker"
+
+
+# ============================================================================
+# Advanced Training Admin
+# ============================================================================
+
+class AdvancedTrainingInline(admin.TabularInline):
+    """Inline for managing training records within staff detail view"""
+    model = AdvancedTraining
+    extra = 1
+    fields = ('training_type', 'completion_date', 'approver_initials', 'termination_date', 'custom_type', 'notes')
+    autocomplete_fields = ['training_type']
+
+
+@admin.register(AdvancedStaff)
+class AdvancedStaffAdmin(admin.ModelAdmin):
+    list_display = ('badge_number', 'full_name', 'role', 'is_active', 'training_count')
+    list_filter = ('is_active', 'role')
+    search_fields = ('badge_number', 'first_name', 'last_name')
+    ordering = ('badge_number',)
+    inlines = [AdvancedTrainingInline]
+
+    fieldsets = (
+        (None, {
+            'fields': ('badge_number', 'first_name', 'last_name', 'role', 'is_active')
+        }),
+    )
+
+    def full_name(self, obj):
+        return obj.get_full_name()
+    full_name.short_description = 'Name'
+    full_name.admin_order_field = 'last_name'
+
+    def training_count(self, obj):
+        count = obj.trainings.filter(completion_date__isnull=False).count()
+        return f"{count} training{'s' if count != 1 else ''}"
+    training_count.short_description = 'Completed Trainings'
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.prefetch_related('trainings')
+
+
+@admin.register(AdvancedTrainingType)
+class AdvancedTrainingTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'order', 'allows_custom_type', 'is_active', 'training_count')
+    list_filter = ('is_active', 'allows_custom_type')
+    search_fields = ('name',)
+    ordering = ('order', 'name')
+
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'order', 'allows_custom_type', 'is_active')
+        }),
+    )
+
+    def training_count(self, obj):
+        count = obj.trainings.filter(completion_date__isnull=False).count()
+        return f"{count} completed"
+    training_count.short_description = 'Completion Count'
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.prefetch_related('trainings')
+
+
+@admin.register(AdvancedTraining)
+class AdvancedTrainingAdmin(admin.ModelAdmin):
+    list_display = ('staff', 'training_type', 'completion_date', 'approver_initials',
+                    'termination_date', 'custom_type', 'status_display')
+    list_filter = ('training_type', 'staff__role', 'staff__is_active', 'completion_date', 'termination_date')
+    search_fields = ('staff__badge_number', 'staff__first_name', 'staff__last_name',
+                     'approver_initials', 'custom_type')
+    date_hierarchy = 'completion_date'
+    ordering = ('-completion_date',)
+    autocomplete_fields = ['staff', 'training_type']
+
+    fieldsets = (
+        ('Staff & Training', {
+            'fields': ('staff', 'training_type', 'custom_type')
+        }),
+        ('Completion Details', {
+            'fields': ('completion_date', 'approver_initials', 'termination_date')
+        }),
+        ('Additional Information', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def status_display(self, obj):
+        if not obj.completion_date:
+            return "Not Completed"
+        elif obj.is_expired:
+            return "❌ Expired"
+        elif obj.is_expiring_soon():
+            return "⚠️ Expiring Soon"
+        else:
+            return "✓ Current"
+    status_display.short_description = 'Status'
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('staff', 'training_type')

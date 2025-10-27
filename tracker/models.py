@@ -254,3 +254,150 @@ class UnsignLog(models.Model):
 
     def __str__(self):
         return f"Unsigned: {self.trainee.badge_number} - {self.task.name} by {self.unsigned_by}"
+
+
+# ============================================================================
+# Advanced Training Models
+# ============================================================================
+# These models track advanced training for staff members (separate from
+# orientation/trainee tracking). Imported from ADV_TrainingStatus_WIP.xlsx.
+# ============================================================================
+
+class AdvancedStaff(models.Model):
+    """Staff member receiving advanced training (separate from trainee orientation)"""
+
+    ROLE_CHOICES = [
+        ('Operator', 'Operator'),
+        ('Student', 'Student'),
+        ('Trainee', 'Trainee'),
+        ('Staff', 'Staff'),
+        ('Faculty', 'Faculty'),
+        ('HP', 'Health Physics'),
+        ('Other', 'Other'),
+    ]
+
+    badge_number = models.CharField(max_length=20, unique=True, db_index=True)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True, help_text="False for removed/past staff")
+
+    class Meta:
+        ordering = ['badge_number']
+        verbose_name = 'Advanced Training Staff'
+        verbose_name_plural = 'Advanced Training Staff'
+        indexes = [
+            models.Index(fields=['is_active', 'role'], name='adv_staff_active_role_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.badge_number} - {self.get_full_name()} ({self.role})"
+
+    def get_full_name(self):
+        return f"{self.last_name}, {self.first_name}"
+
+    @property
+    def full_name(self):
+        return self.get_full_name()
+
+
+class AdvancedTrainingType(models.Model):
+    """Types of advanced training (KP, Escort, ExpSamp, Other)"""
+
+    name = models.CharField(max_length=100, unique=True)
+    order = models.IntegerField(default=0, help_text="Display order")
+    allows_custom_type = models.BooleanField(
+        default=False,
+        help_text="True for 'Other Training' categories that have custom type field"
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Advanced Training Type'
+        verbose_name_plural = 'Advanced Training Types'
+
+    def __str__(self):
+        return self.name
+
+
+class AdvancedTraining(models.Model):
+    """Completed advanced training record for a staff member"""
+
+    staff = models.ForeignKey(
+        AdvancedStaff,
+        on_delete=models.CASCADE,
+        related_name='trainings',
+        db_index=True
+    )
+    training_type = models.ForeignKey(
+        AdvancedTrainingType,
+        on_delete=models.CASCADE,
+        related_name='trainings',
+        db_index=True
+    )
+
+    # Training completion details
+    completion_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date training was completed"
+    )
+    approver_initials = models.CharField(
+        max_length=10,
+        blank=True,
+        help_text="Initials of staff who approved (e.g., 'ET', 'AS')"
+    )
+    termination_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date training expires or was terminated"
+    )
+
+    # For "Other Training" types that need custom categorization
+    custom_type = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Custom type for 'Other Training' (e.g., 'Package', 'Experiment', 'Waste')"
+    )
+
+    # Additional metadata
+    notes = models.TextField(blank=True, max_length=10000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-completion_date']
+        verbose_name = 'Advanced Training Record'
+        verbose_name_plural = 'Advanced Training Records'
+        # Unique constraint: One training record per staff+type combo
+        # (custom_type allows multiple "Other" trainings with different types)
+        unique_together = ['staff', 'training_type', 'custom_type']
+        indexes = [
+            models.Index(fields=['staff', 'training_type'], name='adv_train_staff_type_idx'),
+            models.Index(fields=['completion_date'], name='adv_train_completion_idx'),
+            models.Index(fields=['termination_date'], name='adv_train_termination_idx'),
+        ]
+
+    def __str__(self):
+        type_name = f"{self.training_type.name}"
+        if self.custom_type:
+            type_name += f" ({self.custom_type})"
+        return f"{self.staff.badge_number} - {type_name}"
+
+    @property
+    def is_expired(self):
+        """Check if training has expired based on termination date"""
+        if not self.termination_date or not self.completion_date:
+            return False
+        from datetime import date
+        return date.today() > self.termination_date
+
+    @property
+    def is_expiring_soon(self, days=30):
+        """Check if training expires within specified days"""
+        if not self.termination_date or not self.completion_date:
+            return False
+        from datetime import date, timedelta
+        return date.today() <= self.termination_date <= (date.today() + timedelta(days=days))
