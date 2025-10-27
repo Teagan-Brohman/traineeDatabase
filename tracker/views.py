@@ -881,7 +881,7 @@ def advanced_staff_main(request):
     Main full-featured advanced training page with inline editing, filtering, and search.
     Similar to trainee_list but for advanced training staff.
     """
-    from .models import AdvancedStaff, AdvancedTrainingType
+    from .models import AdvancedStaff, AdvancedTrainingType, AdvancedTraining
     from django.db.models import Prefetch
 
     # Get filter parameters
