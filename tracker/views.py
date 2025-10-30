@@ -981,6 +981,13 @@ def update_advanced_training(request):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
 
+    # Check if user has permission to manage advanced training
+    if not (request.user.is_superuser or request.user.has_perm('tracker.manage_advanced_training')):
+        return JsonResponse({
+            'success': False,
+            'error': 'You do not have permission to manage advanced training records. Please contact an administrator.'
+        }, status=403)
+
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -1077,6 +1084,13 @@ def delete_advanced_training(request, training_id):
 
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    # Check if user has permission to manage advanced training
+    if not (request.user.is_superuser or request.user.has_perm('tracker.manage_advanced_training')):
+        return JsonResponse({
+            'success': False,
+            'error': 'You do not have permission to delete advanced training records. Please contact an administrator.'
+        }, status=403)
 
     try:
         training = AdvancedTraining.objects.get(id=training_id)

@@ -399,6 +399,9 @@ class AdvancedTraining(models.Model):
             models.Index(fields=['completion_date'], name='adv_train_completion_idx'),
             models.Index(fields=['termination_date'], name='adv_train_termination_idx'),
         ]
+        permissions = [
+            ('manage_advanced_training', 'Can manage advanced training records'),
+        ]
 
     def __str__(self):
         type_name = f"{self.training_type.name}"

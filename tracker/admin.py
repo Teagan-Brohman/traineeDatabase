@@ -341,6 +341,41 @@ class AdvancedStaffAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         return qs.prefetch_related('trainings')
 
+    def has_module_permission(self, request):
+        """Control whether this module appears in admin index"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_view_permission(self, request, obj=None):
+        """Control who can view advanced staff records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_add_permission(self, request):
+        """Control who can add advanced staff records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_change_permission(self, request, obj=None):
+        """Control who can edit advanced staff records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        """Control who can delete advanced staff records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
 
 @admin.register(AdvancedTrainingType)
 class AdvancedTrainingTypeAdmin(admin.ModelAdmin):
@@ -375,6 +410,41 @@ class AdvancedTrainingTypeAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.prefetch_related('trainings', 'authorized_signers')
+
+    def has_module_permission(self, request):
+        """Control whether this module appears in admin index"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_view_permission(self, request, obj=None):
+        """Control who can view advanced training types"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_add_permission(self, request):
+        """Control who can add advanced training types"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_change_permission(self, request, obj=None):
+        """Control who can edit advanced training types"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        """Control who can delete advanced training types"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
 
 
 @admin.register(AdvancedTraining)
@@ -415,3 +485,38 @@ class AdvancedTrainingAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('staff', 'training_type')
+
+    def has_module_permission(self, request):
+        """Control whether this module appears in admin index"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_view_permission(self, request, obj=None):
+        """Control who can view advanced training records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_add_permission(self, request):
+        """Control who can add advanced training records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_change_permission(self, request, obj=None):
+        """Control who can edit advanced training records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
+
+    def has_delete_permission(self, request, obj=None):
+        """Control who can delete advanced training records"""
+        return (
+            request.user.is_superuser or
+            request.user.has_perm('tracker.manage_advanced_training')
+        )
