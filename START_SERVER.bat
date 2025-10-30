@@ -66,6 +66,9 @@ if not exist "venv\Scripts\activate.bat" (
 echo [2/6] Activating virtual environment...
 call venv\Scripts\activate.bat
 
+REM After activating venv, use venv's Python (which has Django installed)
+set "VENV_PYTHON=venv\Scripts\python.exe"
+
 echo [3/6] Checking for server lock...
 REM ========================================
 REM TEMPORARY: Hybrid lock detection system
@@ -160,10 +163,10 @@ if !ERRORLEVEL! EQU 0 (
 )
 
 echo [4/6] Running database migrations...
-"%PYTHON_CMD%" manage.py migrate --noinput
+"%VENV_PYTHON%" manage.py migrate --noinput
 
 echo [5/6] Checking for admin user...
-"%PYTHON_CMD%" -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trainee_tracker.settings'); import django; django.setup(); from django.contrib.auth.models import User; print('Admin exists' if User.objects.filter(is_superuser=True).exists() else 'No admin found')"
+"%VENV_PYTHON%" -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trainee_tracker.settings'); import django; django.setup(); from django.contrib.auth.models import User; print('Admin exists' if User.objects.filter(is_superuser=True).exists() else 'No admin found')"
 
 echo [6/6] Starting server...
 
@@ -196,7 +199,7 @@ REM ========================================
 REM Start idle monitor (background)
 REM ========================================
 echo Starting idle monitor (timeout: 20 minutes)...
-start /min "Idle Monitor" "%PYTHON_CMD%" "%CD%\idle_monitor.py"
+start /min "Idle Monitor" "%VENV_PYTHON%" "%CD%\idle_monitor.py"
 timeout /t 2 /nobreak >nul
 
 echo.
@@ -234,7 +237,7 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
 echo.
 echo Starting Django server...
 echo.
-"%PYTHON_CMD%" manage.py runserver 0.0.0.0:8000
+"%VENV_PYTHON%" manage.py runserver 0.0.0.0:8000
 
 REM ========================================
 REM Cleanup on server stop
