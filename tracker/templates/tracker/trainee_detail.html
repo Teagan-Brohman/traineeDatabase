@@ -4,7 +4,12 @@
 
 {% block content %}
 <div style="margin-bottom: 20px;">
-    <a href="{% url 'trainee_list' %}" class="btn">← Back to List</a>
+    {% if from_cohort %}
+        <a href="{% url 'archive_detail' from_cohort.id %}" class="btn">← Back to Archive ({{ from_cohort.name }})</a>
+        <a href="{% url 'trainee_list' %}" class="btn" style="margin-left: 10px;">Back to Main List</a>
+    {% else %}
+        <a href="{% url 'trainee_list' %}" class="btn">← Back to List</a>
+    {% endif %}
 </div>
 
 <div class="card">

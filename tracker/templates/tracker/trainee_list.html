@@ -96,7 +96,7 @@
                 </td>
                 <td class="extra-info">{{ trainee.signoffs.count }} tasks</td>
                 <td>
-                    <a href="{% url 'trainee_detail' trainee.badge_number %}" class="btn">View Details</a>
+                    <a href="{% url 'trainee_detail' trainee.badge_number %}{% if is_archive %}?from_cohort={{ cohort.id }}{% endif %}" class="btn">View Details</a>
                 </td>
             </tr>
             {% empty %}

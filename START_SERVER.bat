@@ -160,10 +160,10 @@ if !ERRORLEVEL! EQU 0 (
 )
 
 echo [4/6] Running database migrations...
-python manage.py migrate --noinput
+"%PYTHON_CMD%" manage.py migrate --noinput
 
 echo [5/6] Checking for admin user...
-python -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trainee_tracker.settings'); import django; django.setup(); from django.contrib.auth.models import User; print('Admin exists' if User.objects.filter(is_superuser=True).exists() else 'No admin found')"
+"%PYTHON_CMD%" -c "import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trainee_tracker.settings'); import django; django.setup(); from django.contrib.auth.models import User; print('Admin exists' if User.objects.filter(is_superuser=True).exists() else 'No admin found')"
 
 echo [6/6] Starting server...
 
@@ -196,7 +196,7 @@ REM ========================================
 REM Start idle monitor (background)
 REM ========================================
 echo Starting idle monitor (timeout: 20 minutes)...
-start /min "Idle Monitor" python "%CD%\idle_monitor.py"
+start /min "Idle Monitor" "%PYTHON_CMD%" "%CD%\idle_monitor.py"
 timeout /t 2 /nobreak >nul
 
 echo.
@@ -234,7 +234,7 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
 echo.
 echo Starting Django server...
 echo.
-python manage.py runserver 0.0.0.0:8000
+"%PYTHON_CMD%" manage.py runserver 0.0.0.0:8000
 
 REM ========================================
 REM Cleanup on server stop

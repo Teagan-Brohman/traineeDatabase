@@ -4,9 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Django web application for tracking trainee badge progress through training requirements. Multiple staff members can sign off on tasks, providing an audit trail with timestamps and recorded scores.
+This is a Django web application with two main tracking systems:
 
-**Key Use Case**: Replaces Excel-based tracking system for reactor training programs where trainees must complete ordered tasks (SOPs, quizzes, clearances) to earn badges.
+1. **Orientation Tracking** - Tracks trainee badge progress through ordered training requirements. Multiple staff members can sign off on tasks, providing an audit trail with timestamps and recorded scores.
+
+2. **Advanced Training** - Tracks ongoing staff training requirements (KP, Escort, ExpSamp, etc.) with expiration dates and authorization controls.
+
+**Key Use Case**: Replaces Excel-based tracking system for reactor training programs where trainees must complete ordered tasks (SOPs, quizzes, clearances) to earn badges, and staff must maintain current training certifications.
 
 ## Development Environment Setup
 
@@ -36,14 +40,22 @@ python manage.py runserver 0.0.0.0:8000
 
 ### Core Data Model Relationships
 
-The application uses four interconnected models in `tracker/models.py`:
+The application has two parallel tracking systems in `tracker/models.py`:
 
+**Orientation Tracking Models:**
 1. **Trainee** - Individual trainees with badge numbers and cohorts
 2. **Task** - Ordered training requirements (SOPs, quizzes, procedures)
 3. **SignOff** - Junction table linking Trainee + Task with staff approval (unique constraint on trainee+task pair)
 4. **StaffProfile** - One-to-one extension of Django User for staff initials
 
-**Critical Design Pattern**: SignOff uses `unique_together = ['trainee', 'task']` meaning each task can only be signed off once per trainee. Updates replace the existing signoff (including who signed and when).
+**Advanced Training Models:**
+1. **AdvancedStaff** - Staff members requiring ongoing training
+2. **AdvancedTrainingType** - Types of training (KP, Escort, ExpSamp, etc.)
+3. **AdvancedTraining** - Completion records linking staff to training types
+
+**Critical Design Pattern**:
+- Orientation SignOff uses `unique_together = ['trainee', 'task']` meaning each task can only be signed off once per trainee. Updates replace the existing signoff (including who signed and when).
+- Advanced Training uses `unique_together = ['staff', 'training_type', 'custom_type']` allowing multiple "Other" training records with different custom types.
 
 ### Authentication Flow
 
@@ -54,16 +66,32 @@ The application uses four interconnected models in `tracker/models.py`:
 
 ### URL Structure
 
+**Orientation Tracking:**
 ```
-/                           -> Redirects to trainee list
-/tracker/                   -> List all trainees (trainee_list view)
-/tracker/<badge_number>/    -> Detail view for one trainee (trainee_detail view)
+/                                           -> Redirects to trainee list
+/tracker/                                   -> List all trainees (trainee_list view)
+/tracker/<badge_number>/                    -> Detail view for one trainee (trainee_detail view)
 /tracker/<badge_number>/signoff/<task_id>/  -> POST endpoint to sign off task
 /tracker/<badge_number>/unsign/<task_id>/   -> POST endpoint to remove sign-off
-/tracker/bulk-signoff/      -> POST endpoint for bulk operations (JSON)
-/tracker/export/            -> Export current cohort to Excel
-/tracker/archive/           -> View archived cohorts
-/admin/                     -> Django admin interface
+/tracker/bulk-signoff/                      -> POST endpoint for bulk operations (JSON)
+/tracker/export/                            -> Export current cohort to Excel
+/tracker/archive/                           -> View archived cohorts
+/tracker/archive/<cohort_id>/               -> View specific archived cohort
+```
+
+**Advanced Training:**
+```
+/tracker/advanced/main/                     -> Main interface with inline editing
+/tracker/advanced/<badge_number>/           -> Staff detail view
+/tracker/advanced/export/                   -> Excel export (active staff)
+/tracker/advanced/export/removed/           -> Excel export (removed staff)
+/tracker/advanced/update-training/          -> AJAX POST endpoint for add/edit
+/tracker/advanced/delete-training/<id>/     -> AJAX POST endpoint for delete
+```
+
+**Admin:**
+```
+/admin/                                     -> Django admin interface
 ```
 
 ### Admin Interface Customization
@@ -291,6 +319,151 @@ Comprehensive test suite in `tracker/tests.py:BulkSignOffTestCase`:
 - Invalid JSON handling
 
 See tests for examples of expected behavior and edge cases.
+
+---
+
+## Advanced Training System
+
+The application includes a separate **Advanced Training System** for tracking ongoing staff training requirements beyond initial orientation. This system runs parallel to the trainee orientation tracking with its own models, views, and interface.
+
+### Advanced Training Data Models
+
+**Located in**: `tracker/models.py`
+
+Three interconnected models support advanced training:
+
+1. **AdvancedStaff** - Staff members (separate from trainees)
+   - Badge number, name, role (Staff/Grad/Postdoc/Other)
+   - `is_active` flag for active vs. removed staff
+   - Separate from trainee records
+
+2. **AdvancedTrainingType** - Types of training required
+   - Name (e.g., "KP Training", "Escort Training", "ExpSamp Training")
+   - Display order
+   - `allows_custom_type` flag for "Other Training" categories
+   - **Authorization**: `authorized_signers` ManyToMany field restricts who can sign off
+   - `can_user_sign_off(user)` method checks authorization
+
+3. **AdvancedTraining** - Completion records
+   - Links staff to training type
+   - `completion_date` - When training was actually completed
+   - `signed_at` - When training was signed off in the system
+   - `approver_initials` - Auto-populated from logged-in user
+   - `termination_date` - Optional expiration date
+   - `custom_type` - For "Other Training" subcategories
+   - `is_expired` property and `is_expiring_soon()` method for status
+
+### URL Structure
+
+```
+/tracker/advanced/                          -> List view (deprecated, use main)
+/tracker/advanced/main/                     -> Main full-featured page with inline editing
+/tracker/advanced/removed/                  -> Removed staff list
+/tracker/advanced/export/                   -> Excel export (active staff)
+/tracker/advanced/export/removed/           -> Excel export (removed staff)
+/tracker/advanced/update-training/          -> AJAX endpoint for add/edit
+/tracker/advanced/delete-training/<id>/     -> AJAX endpoint for delete
+/tracker/advanced/<badge_number>/           -> Staff detail view
+```
+
+### Main Interface Features
+
+**View**: `advanced_staff_main` in `tracker/views.py`
+**Template**: `tracker/templates/tracker/advanced_staff_main.html`
+
+Key features:
+- **Inline editing via modals** - Click any cell to add/edit training
+- **Filtering** - By role and status (active/removed/all)
+- **Client-side search** - Filter by name or badge number
+- **Color-coded status indicators**:
+  - ✓ (green) - Current/valid training
+  - ⚠️ (yellow) - Expiring soon (within 30 days)
+  - ❌ (red) - Expired training
+  - + (gray) - No training recorded
+- **AJAX operations** - No page reloads for add/edit/delete
+- **Authorization enforcement** - Only authorized users can sign off specific training types
+
+### Authorization System
+
+Works identically to orientation tracking tasks:
+
+1. **Admin Configuration**: Go to Django Admin → Advanced Training Types
+2. **Set Authorized Signers**: Select specific users, or leave empty to allow all staff
+3. **Enforcement**: `update_advanced_training` view checks `training_type.can_user_sign_off(request.user)`
+4. **Error Handling**: Returns HTTP 403 with clear error message if unauthorized
+
+### Auto-Population on Sign-Off
+
+When a user signs off advanced training:
+- `approver_initials` - Auto-filled from `request.user.staff_profile.initials`
+- `signed_at` - Auto-set to current timestamp (`timezone.now()`)
+- **Read-only in UI** - User cannot manually edit these fields
+
+This ensures accurate audit trail of who signed off and when.
+
+### Excel Export/Import
+
+**Import Script**: `import_advanced_data.py`
+- Reads from `ADV_TrainingStatus_WIP.xlsx`
+- Two sheets: "ADV" (active) and "ADV_Removed" (removed)
+- Column structure: Badge, Last Name, First Name, Role, then training columns
+- Run once during initial setup: `python import_advanced_data.py`
+
+**Export Functions**: `export_advanced_excel()` and `export_advanced_excel_removed()`
+- Use same Excel file as template
+- Clear existing data and write current database records
+- Export all 5 training types with dates, approver initials, termination dates
+- Dynamic export button based on status filter in UI
+
+### Navigation Integration
+
+The main navigation bar (in `base.html`) provides system-wide navigation:
+- **Orientation Tracking** - Trainee badge tracking
+- **Advanced Training** - Staff training tracking
+- **Archives** - Historical cohort records
+
+Page-specific actions (exports, filters) remain in page headers.
+
+### Admin Interface Customization
+
+**AdvancedStaffAdmin**:
+- Inline display of all training records
+- Quick filters by role and active status
+- Training status badges in change list
+
+**AdvancedTrainingTypeAdmin**:
+- `filter_horizontal` widget for authorized signers
+- Displays "All staff" or "{count} staff" for authorization
+- Grouped fieldsets for clarity
+
+**AdvancedTrainingAdmin**:
+- Autocomplete for staff and training type
+- Date hierarchy by completion date
+- Ordered by most recent sign-off (`-signed_at`)
+- Color-coded status display column
+
+### Common Development Patterns
+
+When modifying advanced training:
+
+1. **Model Changes**: Always create migration after model updates
+2. **View Authorization**: Use `training_type.can_user_sign_off(user)` before allowing sign-off
+3. **Auto-Population**: Never accept `approver_initials` or `signed_at` from user input
+4. **AJAX Responses**: Include full training data in JSON for client-side updates
+5. **Template Variables**: Pass `user_initials` in context for read-only display
+
+### Key Differences from Orientation Tracking
+
+| Feature | Orientation Tracking | Advanced Training |
+|---------|---------------------|-------------------|
+| **Subjects** | Trainees (temporary) | Staff (ongoing) |
+| **Tasks/Training** | Ordered sequence | Multiple types |
+| **Completion** | One-time badge earning | Recurring/expiring |
+| **Status** | Active/Archived by cohort | Active/Removed individuals |
+| **Interface** | List + detail pages | Grid with inline editing |
+| **Import** | Excel with task columns | Excel with training columns |
+
+Both systems share the same authorization pattern and audit trail approach.
 
 ---
 

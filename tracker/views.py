@@ -204,6 +204,15 @@ def trainee_detail(request, badge_number):
     tasks = Task.objects.filter(is_active=True).prefetch_related('authorized_signers').order_by('order')
     signoffs = SignOff.objects.filter(trainee=trainee).select_related('task', 'signed_by')
 
+    # Check if viewing from an archive (for navigation context)
+    from_cohort_id = request.GET.get('from_cohort')
+    from_cohort = None
+    if from_cohort_id:
+        try:
+            from_cohort = Cohort.objects.get(id=from_cohort_id)
+        except Cohort.DoesNotExist:
+            pass
+
     # Create a dict of task_id -> signoff for easier template lookup
     signoff_dict = {so.task.id: so for so in signoffs}
 
@@ -228,6 +237,7 @@ def trainee_detail(request, badge_number):
         'trainee': trainee,
         'task_progress': task_progress,
         'progress_percentage': trainee.get_progress_percentage(),
+        'from_cohort': from_cohort,
     }
     return render(request, 'tracker/trainee_detail.html', context)
 
