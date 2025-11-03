@@ -194,6 +194,72 @@
             }
         }
 
+        /* Customization panel */
+        .customization-panel {
+            background: #f8f9fa;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 800px;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .panel-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .control-select {
+            padding: 6px 10px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .control-select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-small:hover {
+            background-color: #545b62;
+        }
+
         /* Screen-only controls */
         .controls {
             text-align: center;
@@ -230,6 +296,31 @@
     <div class="controls no-print">
         <button onclick="window.print()" class="btn">🖨️ Print</button>
         <a href="{% url 'advanced_staff_main' %}" class="btn btn-secondary">← Back to Advanced Training</a>
+    </div>
+
+    <div class="customization-panel no-print">
+        <div class="panel-title">⚙️ Display Settings</div>
+        <div class="panel-controls">
+            <div class="control-group">
+                <label for="fontSizeSelect">Font Size:</label>
+                <select id="fontSizeSelect" class="control-select">
+                    <option value="7">Extra Small (7pt)</option>
+                    <option value="8" selected>Small (8pt)</option>
+                    <option value="9">Medium (9pt)</option>
+                    <option value="10">Large (10pt)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="columnSelect">Columns:</label>
+                <select id="columnSelect" class="control-select">
+                    <option value="3">3 Columns</option>
+                    <option value="4" selected>4 Columns</option>
+                    <option value="5">5 Columns</option>
+                    <option value="6">6 Columns</option>
+                </select>
+            </div>
+            <button id="resetSettings" class="btn-small">Reset to Defaults</button>
+        </div>
     </div>
 
     <div class="header">
@@ -279,5 +370,81 @@
             <input type="text" class="name-input" placeholder="Type name here">
         </div>
     </div>
+
+    <script>
+        // Customization settings with localStorage persistence
+        const fontSizeSelect = document.getElementById('fontSizeSelect');
+        const columnSelect = document.getElementById('columnSelect');
+        const resetButton = document.getElementById('resetSettings');
+        const staffGrid = document.querySelector('.staff-grid');
+        const staffItems = document.querySelectorAll('.staff-item');
+
+        // Default settings
+        const defaults = {
+            fontSize: '8',
+            columns: '4'
+        };
+
+        // Load settings from localStorage
+        function loadSettings() {
+            const savedFontSize = localStorage.getItem('staffList_fontSize') || defaults.fontSize;
+            const savedColumns = localStorage.getItem('staffList_columns') || defaults.columns;
+
+            // Set select values
+            fontSizeSelect.value = savedFontSize;
+            columnSelect.value = savedColumns;
+
+            // Apply settings
+            applyFontSize(savedFontSize);
+            applyColumnCount(savedColumns);
+        }
+
+        // Save setting to localStorage
+        function saveSetting(key, value) {
+            localStorage.setItem(key, value);
+        }
+
+        // Apply font size to staff items
+        function applyFontSize(size) {
+            staffItems.forEach(item => {
+                item.style.fontSize = size + 'pt';
+            });
+        }
+
+        // Apply column count to grid
+        function applyColumnCount(count) {
+            staffGrid.style.gridTemplateColumns = `repeat(${count}, 1fr)`;
+        }
+
+        // Reset to defaults
+        function resetSettings() {
+            localStorage.removeItem('staffList_fontSize');
+            localStorage.removeItem('staffList_columns');
+
+            fontSizeSelect.value = defaults.fontSize;
+            columnSelect.value = defaults.columns;
+
+            applyFontSize(defaults.fontSize);
+            applyColumnCount(defaults.columns);
+        }
+
+        // Event listeners
+        fontSizeSelect.addEventListener('change', function() {
+            const size = this.value;
+            saveSetting('staffList_fontSize', size);
+            applyFontSize(size);
+        });
+
+        columnSelect.addEventListener('change', function() {
+            const count = this.value;
+            saveSetting('staffList_columns', count);
+            applyColumnCount(count);
+        });
+
+        resetButton.addEventListener('click', resetSettings);
+
+        // Load settings on page load
+        loadSettings();
+    </script>
 </body>
 </html>
