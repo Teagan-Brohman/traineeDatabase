@@ -7,6 +7,7 @@
 <div class="header">
     <h1>{{ page_title }}</h1>
     <div class="header-actions">
+        <button id="openImportModal" class="btn btn-primary" style="margin-right: 10px;">Import Trainees</button>
         <a href="{% url 'advanced_staff_printable_list' %}" class="btn btn-info" target="_blank" style="margin-right: 10px;">Print Staff List</a>
         {% if status_filter == 'removed' %}
             <a href="{% url 'export_advanced_excel_removed' %}" class="btn btn-success">Export to Excel (Removed)</a>
@@ -826,6 +827,324 @@ function clearFilters() {
     document.getElementById('searchBox').value = '';
     applyFilters();
 }
+</script>
+
+<!-- Import Trainees Modal -->
+<div id="importTraineesModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content import-trainee-modal">
+        <h2>Import Trainees to Advanced Training</h2>
+        <p style="margin-bottom: 15px; color: #666;">Select trainees to import. Staff with incomplete training (< 100%) will show a warning.</p>
+
+        <!-- Search box -->
+        <input type="text" id="traineeSearchInput" class="search-input" placeholder="Search by badge number or name..." style="margin-bottom: 15px; width: 100%;">
+
+        <!-- Loading spinner -->
+        <div id="traineeLoadingSpinner" style="text-align: center; padding: 40px;">
+            <div class="progress-spinner"></div>
+            <p>Loading trainees...</p>
+        </div>
+
+        <!-- Trainee list -->
+        <div id="traineeImportList" class="trainee-import-list" style="display: none;">
+            <!-- Trainees will be populated here via JavaScript -->
+        </div>
+
+        <!-- Selected count and actions -->
+        <div class="import-modal-actions">
+            <span id="selectedImportCount">0 selected</span>
+            <button id="confirmImportBtn" class="btn btn-primary">Import Selected</button>
+            <button id="cancelImportBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Import modal styles */
+.import-trainee-modal {
+    width: 700px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.trainee-import-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.trainee-import-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.trainee-import-item:hover {
+    background-color: #f5f5f5;
+}
+
+.trainee-import-item:last-child {
+    border-bottom: none;
+}
+
+.trainee-import-item input[type="checkbox"] {
+    margin-right: 12px;
+    cursor: pointer;
+}
+
+.trainee-import-item .badge {
+    font-weight: bold;
+    margin-right: 12px;
+    min-width: 60px;
+}
+
+.trainee-import-item .name {
+    flex: 1;
+    margin-right: 12px;
+}
+
+.trainee-import-item .progress {
+    margin-right: 8px;
+    font-size: 14px;
+}
+
+.trainee-import-item .progress.complete {
+    color: green;
+}
+
+.trainee-import-item .progress.incomplete {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+.trainee-import-item .warning-icon {
+    color: #ff9800;
+    font-size: 18px;
+}
+
+.import-modal-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+}
+
+#selectedImportCount {
+    font-weight: bold;
+    color: #333;
+}
+</style>
+
+<script>
+// Import Trainees Modal Logic
+(function() {
+    const modal = document.getElementById('importTraineesModal');
+    const openBtn = document.getElementById('openImportModal');
+    const cancelBtn = document.getElementById('cancelImportBtn');
+    const confirmBtn = document.getElementById('confirmImportBtn');
+    const traineeList = document.getElementById('traineeImportList');
+    const loadingSpinner = document.getElementById('traineeLoadingSpinner');
+    const searchInput = document.getElementById('traineeSearchInput');
+    const selectedCountSpan = document.getElementById('selectedImportCount');
+
+    let allTrainees = [];
+    let selectedTraineeIds = new Set();
+
+    // Open modal and fetch trainees
+    openBtn.addEventListener('click', function() {
+        modal.style.display = 'flex';
+        fetchTrainees();
+    });
+
+    // Close modal
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    function closeModal() {
+        modal.style.display = 'none';
+        selectedTraineeIds.clear();
+        updateSelectedCount();
+    }
+
+    // Fetch trainees from server
+    function fetchTrainees() {
+        traineeList.style.display = 'none';
+        loadingSpinner.style.display = 'block';
+
+        fetch('{% url "get_trainees_for_import" %}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    allTrainees = data.trainees;
+                    renderTrainees(allTrainees);
+                    loadingSpinner.style.display = 'none';
+                    traineeList.style.display = 'block';
+                } else {
+                    alert('Error loading trainees: ' + data.error);
+                    closeModal();
+                }
+            })
+            .catch(error => {
+                alert('Error loading trainees: ' + error);
+                closeModal();
+            });
+    }
+
+    // Render trainee list
+    function renderTrainees(trainees) {
+        traineeList.innerHTML = '';
+
+        if (trainees.length === 0) {
+            traineeList.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">No trainees found.</p>';
+            return;
+        }
+
+        trainees.forEach(trainee => {
+            const item = document.createElement('div');
+            item.className = 'trainee-import-item';
+            item.dataset.traineeId = trainee.id;
+            item.dataset.badge = trainee.badge_number.toLowerCase();
+            item.dataset.name = trainee.full_name.toLowerCase();
+
+            const isComplete = trainee.progress_percentage === 100;
+            const progressClass = isComplete ? 'complete' : 'incomplete';
+
+            item.innerHTML = `
+                <input type="checkbox" class="trainee-import-checkbox" data-id="${trainee.id}">
+                <span class="badge">${trainee.badge_number}</span>
+                <span class="name">${trainee.full_name}</span>
+                <span class="progress ${progressClass}">${trainee.progress_percentage}%</span>
+                ${!isComplete ? '<span class="warning-icon">⚠️</span>' : ''}
+            `;
+
+            traineeList.appendChild(item);
+
+            // Add click handler for checkbox
+            const checkbox = item.querySelector('.trainee-import-checkbox');
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    selectedTraineeIds.add(parseInt(this.dataset.id));
+                } else {
+                    selectedTraineeIds.delete(parseInt(this.dataset.id));
+                }
+                updateSelectedCount();
+            });
+
+            // Allow clicking the whole item to toggle checkbox
+            item.addEventListener('click', function(e) {
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
+            });
+        });
+    }
+
+    // Search/filter trainees
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        const items = traineeList.querySelectorAll('.trainee-import-item');
+
+        items.forEach(item => {
+            const badge = item.dataset.badge;
+            const name = item.dataset.name;
+
+            if (badge.includes(searchTerm) || name.includes(searchTerm)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // Update selected count
+    function updateSelectedCount() {
+        const count = selectedTraineeIds.size;
+        selectedCountSpan.textContent = `${count} selected`;
+    }
+
+    // Confirm import
+    confirmBtn.addEventListener('click', function() {
+        if (selectedTraineeIds.size === 0) {
+            alert('Please select at least one trainee to import.');
+            return;
+        }
+
+        // Check if any selected trainees are incomplete
+        const selectedTrainees = allTrainees.filter(t => selectedTraineeIds.has(t.id));
+        const incompleteTrainees = selectedTrainees.filter(t => t.progress_percentage < 100);
+
+        if (incompleteTrainees.length > 0) {
+            const message = `Warning: ${incompleteTrainees.length} trainee(s) have incomplete training:\n\n` +
+                incompleteTrainees.map(t => `${t.badge_number} ${t.full_name} (${t.progress_percentage}%)`).join('\n') +
+                '\n\nImport anyway?';
+
+            if (!confirm(message)) {
+                return;
+            }
+        }
+
+        // Proceed with import
+        importTrainees();
+    });
+
+    // Import trainees via AJAX
+    function importTrainees() {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Importing...';
+
+        fetch('{% url "import_trainees_to_advanced" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                trainee_ids: Array.from(selectedTraineeIds)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let message = `Successfully imported ${data.imported} trainee(s)!`;
+
+                if (data.incomplete && data.incomplete.length > 0) {
+                    message += `\n\nNote: ${data.incomplete.length} trainee(s) had incomplete training:\n` +
+                        data.incomplete.map(t => `${t.badge} ${t.name} (${t.progress})`).join('\n');
+                }
+
+                alert(message);
+                closeModal();
+                location.reload(); // Reload to show new staff
+            } else {
+                if (data.duplicates) {
+                    const duplicateList = data.duplicates.map(d => `${d.badge} ${d.name}`).join('\n');
+                    alert(`Error: Cannot import - badge numbers already exist in Advanced Training:\n\n${duplicateList}\n\nPlease check the Advanced Training staff list.`);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            }
+        })
+        .catch(error => {
+            alert('Error importing trainees: ' + error);
+        })
+        .finally(() => {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Import Selected';
+        });
+    }
+})();
 </script>
 
 {% endblock %}

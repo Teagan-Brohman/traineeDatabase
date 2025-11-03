@@ -1149,3 +1149,127 @@ def advanced_staff_printable_list(request):
     }
 
     return render(request, 'tracker/advanced_staff_printable.html', context)
+
+
+@login_required
+def get_trainees_for_import(request):
+    """
+    AJAX endpoint to fetch all active trainees for import to advanced training.
+    Returns trainee data with completion percentages.
+    """
+    from django.http import JsonResponse
+    from .models import Trainee
+
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'error': 'GET request required'}, status=405)
+
+    # Get all active trainees
+    trainees = Trainee.objects.filter(is_active=True).order_by('badge_number')
+
+    trainee_list = []
+    for trainee in trainees:
+        trainee_list.append({
+            'id': trainee.id,
+            'badge_number': trainee.badge_number,
+            'full_name': trainee.full_name,
+            'first_name': trainee.first_name,
+            'last_name': trainee.last_name,
+            'cohort': str(trainee.cohort) if trainee.cohort else '',
+            'progress_percentage': trainee.get_progress_percentage(),
+        })
+
+    return JsonResponse({'success': True, 'trainees': trainee_list})
+
+
+@login_required
+def import_trainees_to_advanced(request):
+    """
+    AJAX endpoint to import selected trainees to advanced training system.
+    Checks for duplicates and completion status.
+    """
+    from django.http import JsonResponse
+    from .models import Trainee, AdvancedStaff
+    from django.db import transaction
+    import json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    # Check permission
+    if not (request.user.is_superuser or request.user.has_perm('tracker.manage_advanced_training')):
+        return JsonResponse({
+            'success': False,
+            'error': 'You do not have permission to import trainees. Please contact an administrator.'
+        }, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    trainee_ids = data.get('trainee_ids', [])
+    if not trainee_ids:
+        return JsonResponse({'success': False, 'error': 'No trainees selected'}, status=400)
+
+    # Fetch selected trainees
+    trainees = Trainee.objects.filter(id__in=trainee_ids, is_active=True)
+
+    if not trainees.exists():
+        return JsonResponse({'success': False, 'error': 'No valid trainees found'}, status=404)
+
+    # Check for duplicates and incomplete trainees
+    duplicates = []
+    incomplete = []
+    to_import = []
+
+    for trainee in trainees:
+        # Check if badge already exists in AdvancedStaff
+        if AdvancedStaff.objects.filter(badge_number=trainee.badge_number).exists():
+            duplicates.append({
+                'badge': trainee.badge_number,
+                'name': trainee.full_name
+            })
+        else:
+            # Check completion percentage
+            progress = trainee.get_progress_percentage()
+            if progress < 100:
+                incomplete.append({
+                    'badge': trainee.badge_number,
+                    'name': trainee.full_name,
+                    'progress': f'{progress}%'
+                })
+            to_import.append(trainee)
+
+    # If duplicates found, block import
+    if duplicates:
+        return JsonResponse({
+            'success': False,
+            'error': 'Duplicate badge numbers found',
+            'duplicates': duplicates
+        }, status=400)
+
+    # Import trainees
+    imported_count = 0
+    try:
+        with transaction.atomic():
+            for trainee in to_import:
+                AdvancedStaff.objects.create(
+                    badge_number=trainee.badge_number,
+                    first_name=trainee.first_name,
+                    last_name=trainee.last_name,
+                    role='Trainee',
+                    is_active=True
+                )
+                imported_count += 1
+
+        return JsonResponse({
+            'success': True,
+            'imported': imported_count,
+            'incomplete': incomplete
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error during import: {str(e)}'
+        }, status=500)
