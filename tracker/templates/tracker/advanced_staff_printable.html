@@ -320,6 +320,17 @@
                     <option value="6">6 Columns</option>
                 </select>
             </div>
+            <div class="control-group">
+                <label for="badgeWidthSelect">Badge Width:</label>
+                <select id="badgeWidthSelect" class="control-select">
+                    <option value="35">Compact (35px)</option>
+                    <option value="40">Small (40px)</option>
+                    <option value="45">Medium (45px)</option>
+                    <option value="50" selected>Standard (50px)</option>
+                    <option value="55">Large (55px)</option>
+                    <option value="60">Extra Large (60px)</option>
+                </select>
+            </div>
             <button id="resetSettings" class="btn-small">Reset to Defaults</button>
         </div>
     </div>
@@ -376,28 +387,34 @@
         // Customization settings with localStorage persistence
         const fontSizeSelect = document.getElementById('fontSizeSelect');
         const columnSelect = document.getElementById('columnSelect');
+        const badgeWidthSelect = document.getElementById('badgeWidthSelect');
         const resetButton = document.getElementById('resetSettings');
         const staffGrid = document.querySelector('.staff-grid');
         const staffItems = document.querySelectorAll('.staff-item');
+        const badgeElements = document.querySelectorAll('.staff-item .badge');
 
         // Default settings
         const defaults = {
             fontSize: '8',
-            columns: '4'
+            columns: '4',
+            badgeWidth: '50'
         };
 
         // Load settings from localStorage
         function loadSettings() {
             const savedFontSize = localStorage.getItem('staffList_fontSize') || defaults.fontSize;
             const savedColumns = localStorage.getItem('staffList_columns') || defaults.columns;
+            const savedBadgeWidth = localStorage.getItem('staffList_badgeWidth') || defaults.badgeWidth;
 
             // Set select values
             fontSizeSelect.value = savedFontSize;
             columnSelect.value = savedColumns;
+            badgeWidthSelect.value = savedBadgeWidth;
 
             // Apply settings
             applyFontSize(savedFontSize);
             applyColumnCount(savedColumns);
+            applyBadgeWidth(savedBadgeWidth);
         }
 
         // Save setting to localStorage
@@ -417,16 +434,26 @@
             staffGrid.style.gridTemplateColumns = `repeat(${count}, 1fr)`;
         }
 
+        // Apply badge width to badge elements
+        function applyBadgeWidth(width) {
+            badgeElements.forEach(badge => {
+                badge.style.width = width + 'px';
+            });
+        }
+
         // Reset to defaults
         function resetSettings() {
             localStorage.removeItem('staffList_fontSize');
             localStorage.removeItem('staffList_columns');
+            localStorage.removeItem('staffList_badgeWidth');
 
             fontSizeSelect.value = defaults.fontSize;
             columnSelect.value = defaults.columns;
+            badgeWidthSelect.value = defaults.badgeWidth;
 
             applyFontSize(defaults.fontSize);
             applyColumnCount(defaults.columns);
+            applyBadgeWidth(defaults.badgeWidth);
         }
 
         // Event listeners
@@ -440,6 +467,12 @@
             const count = this.value;
             saveSetting('staffList_columns', count);
             applyColumnCount(count);
+        });
+
+        badgeWidthSelect.addEventListener('change', function() {
+            const width = this.value;
+            saveSetting('staffList_badgeWidth', width);
+            applyBadgeWidth(width);
         });
 
         resetButton.addEventListener('click', resetSettings);
