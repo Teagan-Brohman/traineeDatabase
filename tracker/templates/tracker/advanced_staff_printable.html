@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Staff Directory - Printable</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+
+        .header h1 {
+            font-size: 24pt;
+            margin-bottom: 5px;
+        }
+
+        .header .info {
+            font-size: 10pt;
+            color: #666;
+        }
+
+        .legend {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-size: 10pt;
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+        }
+
+        .legend-box {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 1px solid #999;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+
+        .legend-box.escort {
+            background-color: #d0d0d0;
+        }
+
+        /* Staff grid - 3 columns */
+        .staff-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .staff-item {
+            border: 1px solid #999;
+            padding: 8px 10px;
+            background: white;
+            font-size: 10pt;
+            line-height: 1.4;
+        }
+
+        .staff-item.has-escort {
+            background-color: #d0d0d0;
+        }
+
+        .staff-item .badge {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .staff-item .name {
+            color: #000;
+        }
+
+        /* Print-specific styles */
+        @media print {
+            body {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 20pt;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .staff-grid {
+                gap: 6px;
+            }
+
+            .staff-item {
+                padding: 6px 8px;
+                page-break-inside: avoid;
+            }
+
+            /* Ensure proper print colors */
+            .staff-item.has-escort {
+                background-color: #d0d0d0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .legend-box.escort {
+                background-color: #d0d0d0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+        /* Screen-only controls */
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls no-print">
+        <button onclick="window.print()" class="btn">🖨️ Print</button>
+        <a href="{% url 'advanced_staff_main' %}" class="btn btn-secondary">← Back to Advanced Training</a>
+    </div>
+
+    <div class="header">
+        <h1>Active Staff Directory</h1>
+        <div class="info">
+            Generated: {{ generated_date }} |
+            Total Staff: {{ total_count }} |
+            Escort Authorized: {{ escort_count }}
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <span class="legend-box"></span>
+            <span>Regular Staff</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-box escort"></span>
+            <span>Escort Authorized (Current Training)</span>
+        </div>
+    </div>
+
+    <div class="staff-grid">
+        {% for staff in staff_list %}
+        <div class="staff-item{% if staff.has_escort %} has-escort{% endif %}">
+            <div class="badge">{{ staff.badge_number }}</div>
+            <div class="name">{{ staff.full_name }}</div>
+        </div>
+        {% empty %}
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+            No active staff found.
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

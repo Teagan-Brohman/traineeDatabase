@@ -1100,3 +1100,52 @@ def delete_advanced_training(request, training_id):
         return JsonResponse({'success': False, 'error': 'Training record not found'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+def advanced_staff_printable_list(request):
+    """
+    Generate a printable single-page list of all active staff.
+    Staff with current (non-expired) Escort Training are highlighted.
+    """
+    from .models import AdvancedStaff, AdvancedTrainingType, AdvancedTraining
+    from datetime import datetime
+
+    # Get Escort Training type
+    try:
+        escort_type = AdvancedTrainingType.objects.get(name='Escort Training')
+    except AdvancedTrainingType.DoesNotExist:
+        escort_type = None
+
+    # Get all active staff, prefetch trainings for efficiency
+    staff_members = AdvancedStaff.objects.filter(
+        is_active=True
+    ).prefetch_related(
+        'trainings__training_type'
+    ).order_by('last_name', 'first_name')
+
+    # Build staff list with escort status
+    staff_list = []
+    for staff in staff_members:
+        has_current_escort = False
+
+        if escort_type:
+            # Check if staff has current (non-expired) Escort Training
+            escort_training = staff.trainings.filter(training_type=escort_type).first()
+            if escort_training and escort_training.completion_date and not escort_training.is_expired:
+                has_current_escort = True
+
+        staff_list.append({
+            'badge_number': staff.badge_number,
+            'full_name': staff.get_full_name(),
+            'has_escort': has_current_escort,
+        })
+
+    context = {
+        'staff_list': staff_list,
+        'generated_date': datetime.now().strftime('%B %d, %Y'),
+        'total_count': len(staff_list),
+        'escort_count': sum(1 for s in staff_list if s['has_escort']),
+    }
+
+    return render(request, 'tracker/advanced_staff_printable.html', context)
