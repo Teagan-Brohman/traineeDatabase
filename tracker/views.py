@@ -12,10 +12,6 @@ security_logger = logging.getLogger('security')
 @login_required
 def trainee_list(request):
     """Display list of trainees in the current cohort"""
-    # Handle view mode preference
-    view_mode = request.GET.get('view', request.session.get('view_mode', 'standard'))
-    request.session['view_mode'] = view_mode
-
     # Get current cohort
     current_cohort = Cohort.get_current_cohort()
 
@@ -30,7 +26,6 @@ def trainee_list(request):
 
     context = {
         'trainees': trainees,
-        'view_mode': view_mode,
         'current_cohort': current_cohort,
         'tasks': tasks,
     }
@@ -441,10 +436,6 @@ def archive_detail(request, cohort_id):
     cohort = get_object_or_404(Cohort, id=cohort_id)
     current_cohort = Cohort.get_current_cohort()
 
-    # Handle view mode preference
-    view_mode = request.GET.get('view', request.session.get('view_mode', 'standard'))
-    request.session['view_mode'] = view_mode
-
     # Get trainees for this cohort
     trainees = Trainee.objects.filter(is_active=True, cohort=cohort).order_by('badge_number')
 
@@ -453,7 +444,6 @@ def archive_detail(request, cohort_id):
 
     context = {
         'trainees': trainees,
-        'view_mode': view_mode,
         'cohort': cohort,
         'current_cohort': current_cohort,
         'is_archive': True,

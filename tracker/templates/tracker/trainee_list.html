@@ -17,7 +17,7 @@
     {% endif %}
 </div>
 
-<!-- Toolbar with Search and View Mode -->
+<!-- Toolbar with Search -->
 <div class="toolbar">
     <div class="toolbar-left">
         <input
@@ -31,17 +31,12 @@
         <span id="resultCount" class="search-result-count"></span>
     </div>
     <div class="toolbar-right">
-        <div class="view-mode-selector">
-            <a href="?view=standard" class="view-mode-btn {% if view_mode == 'standard' %}active{% endif %}">Standard</a>
-            <a href="?view=compact" class="view-mode-btn {% if view_mode == 'compact' %}active{% endif %}">Compact</a>
-            <a href="?view=detailed" class="view-mode-btn {% if view_mode == 'detailed' %}active{% endif %}">Detailed</a>
-        </div>
         {% if not is_archive %}
-            <a href="{% url 'export_current_cohort' %}" class="btn btn-success" style="margin-left: 15px;">
+            <a href="{% url 'export_current_cohort' %}" class="btn btn-success">
                 Export to Excel
             </a>
         {% else %}
-            <a href="{% url 'export_cohort' cohort.id %}" class="btn btn-success" style="margin-left: 15px;">
+            <a href="{% url 'export_cohort' cohort.id %}" class="btn btn-success">
                 Export to Excel
             </a>
         {% endif %}
@@ -57,7 +52,7 @@
     </div>
 </div>
 
-<div class="{% if view_mode == 'compact' %}compact-view{% elif view_mode == 'detailed' %}detailed-view{% endif %}">
+<div class="detailed-view">
     <table id="traineeTable">
         <thead>
             <tr>
