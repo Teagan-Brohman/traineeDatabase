@@ -1223,8 +1223,12 @@ def import_trainees_to_advanced(request):
     to_import = []
 
     for trainee in trainees:
-        # Check if badge already exists in AdvancedStaff
-        if AdvancedStaff.objects.filter(badge_number=trainee.badge_number).exists():
+        # Strip # from badge number if present
+        badge_number = trainee.badge_number.lstrip('#')
+
+        # Check if badge already exists in AdvancedStaff (check both with and without #)
+        if (AdvancedStaff.objects.filter(badge_number=badge_number).exists() or
+            AdvancedStaff.objects.filter(badge_number=f'#{badge_number}').exists()):
             duplicates.append({
                 'badge': trainee.badge_number,
                 'name': trainee.full_name
@@ -1253,8 +1257,11 @@ def import_trainees_to_advanced(request):
     try:
         with transaction.atomic():
             for trainee in to_import:
+                # Strip # from badge number if present
+                badge_number = trainee.badge_number.lstrip('#')
+
                 AdvancedStaff.objects.create(
-                    badge_number=trainee.badge_number,
+                    badge_number=badge_number,
                     first_name=trainee.first_name,
                     last_name=trainee.last_name,
                     role='Trainee',
