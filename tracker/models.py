@@ -276,10 +276,25 @@ class AdvancedStaff(models.Model):
         ('Other', 'Other'),
     ]
 
+    BADGE_STATUS_CHOICES = [
+        ('badging_in_progress', 'Badging in Progress'),
+        ('ready_to_issue', 'Ready to Issue Badge'),
+        ('issued_active', 'Issued Badge/Active'),
+        ('terminated', 'Terminated Access'),
+        ('onboarding_halted', 'Onboarding Halted'),
+    ]
+
     badge_number = models.CharField(max_length=20, unique=True, db_index=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, db_index=True)
+    badge_status = models.CharField(
+        max_length=20,
+        choices=BADGE_STATUS_CHOICES,
+        default='badging_in_progress',
+        db_index=True,
+        help_text="Current badge issuance status"
+    )
     is_active = models.BooleanField(default=True, db_index=True, help_text="False for removed/past staff")
 
     class Meta:

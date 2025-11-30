@@ -20,6 +20,7 @@ urlpatterns = [
     path('advanced/import/get-trainees/', views.get_trainees_for_import, name='get_trainees_for_import'),
     path('advanced/import/import-trainees/', views.import_trainees_to_advanced, name='import_trainees_to_advanced'),
     path('advanced/update-training/', views.update_advanced_training, name='update_advanced_training'),
+    path('advanced/update-staff-status/', views.update_advanced_staff_status, name='update_advanced_staff_status'),
     path('advanced/delete-training/<int:training_id>/', views.delete_advanced_training, name='delete_advanced_training'),
     path('advanced/<str:badge_number>/', views.advanced_staff_detail, name='advanced_staff_detail'),
 

@@ -10,7 +10,12 @@
       "WebSearch",
       "Bash(for pyver in 3.10 3.11 3.12 3.13)",
       "Bash(do echo \"Downloading psycopg2-binary for Python $pyver...\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(venvScriptsactivate)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(dir:*)",
+      "Bash(venv/bin/python:*)",
+      "Bash(source:*)"
     ],
     "deny": [],
     "ask": []

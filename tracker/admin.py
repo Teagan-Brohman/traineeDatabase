@@ -315,15 +315,15 @@ class AdvancedTrainingInline(admin.TabularInline):
 
 @admin.register(AdvancedStaff)
 class AdvancedStaffAdmin(admin.ModelAdmin):
-    list_display = ('badge_number', 'full_name', 'role', 'is_active', 'training_count')
-    list_filter = ('is_active', 'role')
+    list_display = ('badge_number', 'full_name', 'role', 'badge_status', 'is_active', 'training_count')
+    list_filter = ('is_active', 'role', 'badge_status')
     search_fields = ('badge_number', 'first_name', 'last_name')
     ordering = ('badge_number',)
     inlines = [AdvancedTrainingInline]
 
     fieldsets = (
         (None, {
-            'fields': ('badge_number', 'first_name', 'last_name', 'role', 'is_active')
+            'fields': ('badge_number', 'first_name', 'last_name', 'role', 'badge_status', 'is_active')
         }),
     )
 

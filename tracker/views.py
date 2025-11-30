@@ -928,6 +928,9 @@ def advanced_staff_main(request):
     # Get all roles for filter dropdown
     role_choices = AdvancedStaff.ROLE_CHOICES
 
+    # Get badge status choices for filter and dropdown
+    badge_status_choices = AdvancedStaff.BADGE_STATUS_CHOICES
+
     # Get current user's initials for auto-populating approver field
     user_initials = ''
     try:
@@ -939,6 +942,7 @@ def advanced_staff_main(request):
         'staff_progress': staff_progress,
         'training_types': training_types,
         'role_choices': role_choices,
+        'badge_status_choices': badge_status_choices,
         'role_filter': role_filter,
         'status_filter': status_filter,
         'page_title': 'Advanced Training Management',
@@ -1088,6 +1092,63 @@ def delete_advanced_training(request, training_id):
         return JsonResponse({'success': True})
     except AdvancedTraining.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Training record not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+def update_advanced_staff_status(request):
+    """
+    AJAX endpoint to update badge status for an advanced staff member.
+
+    POST data (JSON):
+    {
+        "staff_id": 123,
+        "badge_status": "ready_to_issue"
+    }
+    """
+    from django.http import JsonResponse
+    from .models import AdvancedStaff
+    import json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    # Check if user has permission to manage advanced training
+    if not (request.user.is_superuser or request.user.has_perm('tracker.manage_advanced_training')):
+        return JsonResponse({
+            'success': False,
+            'error': 'You do not have permission to update staff records. Please contact an administrator.'
+        }, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    staff_id = data.get('staff_id')
+    badge_status = data.get('badge_status')
+
+    if not staff_id or not badge_status:
+        return JsonResponse({'success': False, 'error': 'staff_id and badge_status are required'}, status=400)
+
+    # Validate badge_status is a valid choice
+    valid_statuses = [choice[0] for choice in AdvancedStaff.BADGE_STATUS_CHOICES]
+    if badge_status not in valid_statuses:
+        return JsonResponse({'success': False, 'error': f'Invalid badge_status. Must be one of: {valid_statuses}'}, status=400)
+
+    try:
+        staff = AdvancedStaff.objects.get(id=staff_id)
+        staff.badge_status = badge_status
+        staff.save(update_fields=['badge_status'])
+
+        return JsonResponse({
+            'success': True,
+            'badge_status': staff.badge_status,
+            'badge_status_display': staff.get_badge_status_display(),
+        })
+    except AdvancedStaff.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Staff member not found'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 

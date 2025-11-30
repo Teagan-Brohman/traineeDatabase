@@ -39,6 +39,16 @@
     </div>
 
     <div class="filter-group">
+        <label for="badgeStatusFilter">Badge Status:</label>
+        <select id="badgeStatusFilter" class="filter-select">
+            <option value="">All Badge Statuses</option>
+            {% for status_code, status_name in badge_status_choices %}
+                <option value="{{ status_code }}">{{ status_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
         <label for="searchBox">Search:</label>
         <input type="text" id="searchBox" class="search-input" placeholder="Name or badge number...">
     </div>
@@ -53,6 +63,7 @@
             <thead>
                 <tr>
                     <th class="sticky-col">Badge</th>
+                    <th class="sticky-col">Badge Status</th>
                     <th class="sticky-col">Name</th>
                     <th class="sticky-col">Role</th>
                     {% for training_type in training_types %}
@@ -68,11 +79,21 @@
                         data-badge="{{ item.staff.badge_number }}"
                         data-name="{{ item.staff.get_full_name|lower }}"
                         data-role="{{ item.staff.role }}"
+                        data-badge-status="{{ item.staff.badge_status }}"
                         data-active="{{ item.staff.is_active|lower }}">
                         <td class="sticky-col">
                             <a href="{% url 'advanced_staff_detail' item.staff.badge_number %}">
                                 {{ item.staff.badge_number }}
                             </a>
+                        </td>
+                        <td class="sticky-col badge-status-cell">
+                            <select class="badge-status-select"
+                                    data-staff-id="{{ item.staff.id }}"
+                                    data-original="{{ item.staff.badge_status }}">
+                                {% for status_code, status_name in badge_status_choices %}
+                                    <option value="{{ status_code }}" {% if item.staff.badge_status == status_code %}selected{% endif %}>{{ status_name }}</option>
+                                {% endfor %}
+                            </select>
                         </td>
                         <td class="sticky-col">{{ item.staff.get_full_name }}</td>
                         <td class="sticky-col">{{ item.staff.get_role_display }}</td>
@@ -119,7 +140,7 @@ Click to edit">
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="{{ training_types|length|add:3 }}" style="text-align: center; padding: 40px;">
+                        <td colspan="{{ training_types|length|add:4 }}" style="text-align: center; padding: 40px;">
                             No staff members found.
                         </td>
                     </tr>
@@ -239,6 +260,31 @@ Click to edit">
     border: 1px solid #ddd;
     border-radius: 3px;
     font-size: 14px;
+}
+
+/* Badge status dropdown in table cells */
+.badge-status-cell {
+    padding: 4px !important;
+}
+
+.badge-status-select {
+    font-size: 11px;
+    padding: 3px 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background: white;
+    min-width: 130px;
+    cursor: pointer;
+}
+
+.badge-status-select:hover {
+    border-color: #007bff;
+}
+
+.badge-status-select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .search-input {
@@ -568,6 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Filter event listeners
     document.getElementById('roleFilter').addEventListener('change', applyFilters);
+    document.getElementById('badgeStatusFilter').addEventListener('change', applyFilters);
     document.getElementById('statusFilter').addEventListener('change', function() {
         const role = document.getElementById('roleFilter').value;
         const status = this.value;
@@ -575,6 +622,45 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('searchBox').addEventListener('input', applyFilters);
     document.getElementById('clearFilters').addEventListener('click', clearFilters);
+
+    // Badge status dropdown change handlers
+    document.querySelectorAll('.badge-status-select').forEach(select => {
+        select.addEventListener('change', async function() {
+            const staffId = this.dataset.staffId;
+            const newStatus = this.value;
+            const originalStatus = this.dataset.original;
+            const selectElement = this;
+
+            try {
+                const response = await fetch('{% url "update_advanced_staff_status" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        staff_id: parseInt(staffId),
+                        badge_status: newStatus
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    // Update the data attribute and original value
+                    selectElement.dataset.original = newStatus;
+                    selectElement.closest('tr').dataset.badgeStatus = newStatus;
+                } else {
+                    // Revert to original value on error
+                    selectElement.value = originalStatus;
+                    alert(result.error || 'Failed to update badge status');
+                }
+            } catch (error) {
+                // Revert to original value on error
+                selectElement.value = originalStatus;
+                alert('Error updating badge status: ' + error.message);
+            }
+        });
+    });
 
     // Form submission
     document.getElementById('trainingForm').addEventListener('submit', function(e) {
@@ -803,17 +889,20 @@ async function deleteTraining() {
 // Apply filters
 function applyFilters() {
     const roleFilter = document.getElementById('roleFilter').value.toLowerCase();
+    const badgeStatusFilter = document.getElementById('badgeStatusFilter').value;
     const searchText = document.getElementById('searchBox').value.toLowerCase();
 
     document.querySelectorAll('.staff-row').forEach(row => {
         const badge = row.dataset.badge.toLowerCase();
         const name = row.dataset.name.toLowerCase();
         const role = row.dataset.role.toLowerCase();
+        const badgeStatus = row.dataset.badgeStatus;
 
         const roleMatch = !roleFilter || role === roleFilter;
+        const badgeStatusMatch = !badgeStatusFilter || badgeStatus === badgeStatusFilter;
         const searchMatch = !searchText || name.includes(searchText) || badge.includes(searchText);
 
-        if (roleMatch && searchMatch) {
+        if (roleMatch && badgeStatusMatch && searchMatch) {
             row.classList.remove('filtered-out');
         } else {
             row.classList.add('filtered-out');
@@ -824,6 +913,7 @@ function applyFilters() {
 // Clear filters
 function clearFilters() {
     document.getElementById('roleFilter').value = '';
+    document.getElementById('badgeStatusFilter').value = '';
     document.getElementById('searchBox').value = '';
     applyFilters();
 }
