@@ -43,8 +43,17 @@
         <select id="badgeStatusFilter" class="filter-select">
             <option value="">All Badge Statuses</option>
             {% for status_code, status_name in badge_status_choices %}
-                <option value="{{ status_code }}">{{ status_name }}</option>
+                <option value="{{ status_code }}" {% if badge_status_filter == status_code %}selected{% endif %}>{{ status_name }}</option>
             {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="hasTraineeFilter">Orientation Record:</label>
+        <select id="hasTraineeFilter" class="filter-select">
+            <option value="all" {% if has_trainee_filter == 'all' %}selected{% endif %}>All</option>
+            <option value="yes" {% if has_trainee_filter == 'yes' %}selected{% endif %}>Has Trainee Record</option>
+            <option value="no" {% if has_trainee_filter == 'no' %}selected{% endif %}>No Trainee Record</option>
         </select>
     </div>
 
@@ -64,8 +73,8 @@
                 <tr>
                     <th class="sticky-col">Badge</th>
                     <th class="sticky-col">Badge Status</th>
-                    <th class="sticky-col">Name</th>
                     <th class="sticky-col">Role</th>
+                    <th class="sticky-col">Name</th>
                     {% for training_type in training_types %}
                         <th class="training-col" title="{{ training_type.name }}">
                             {{ training_type.name }}
@@ -95,8 +104,16 @@
                                 {% endfor %}
                             </select>
                         </td>
+                        <td class="sticky-col role-cell">
+                            <select class="role-select"
+                                    data-staff-id="{{ item.staff.id }}"
+                                    data-original="{{ item.staff.role }}">
+                                {% for role_code, role_name in role_choices %}
+                                    <option value="{{ role_code }}" {% if item.staff.role == role_code %}selected{% endif %}>{{ role_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
                         <td class="sticky-col">{{ item.staff.get_full_name }}</td>
-                        <td class="sticky-col">{{ item.staff.get_role_display }}</td>
                         {% for training_type in training_types %}
                             <td class="training-cell"
                                 data-staff-id="{{ item.staff.id }}"
@@ -318,6 +335,32 @@ Click to edit">
     background-color: #6c757d;
     color: white;
     border-color: #545b62;
+}
+
+/* Role dropdown in table cells */
+.role-cell {
+    padding: 4px !important;
+}
+
+.role-select {
+    font-size: 11px;
+    padding: 3px 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background: white;
+    min-width: 100px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.role-select:hover {
+    border-color: #007bff;
+}
+
+.role-select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .search-input {
@@ -651,7 +694,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('statusFilter').addEventListener('change', function() {
         const role = document.getElementById('roleFilter').value;
         const status = this.value;
-        window.location.href = `?role=${role}&status=${status}`;
+        const badgeStatus = document.getElementById('badgeStatusFilter').value;
+        const hasTrainee = document.getElementById('hasTraineeFilter').value;
+        window.location.href = `?role=${role}&status=${status}&badge_status=${badgeStatus}&has_trainee=${hasTrainee}`;
+    });
+    document.getElementById('hasTraineeFilter').addEventListener('change', function() {
+        const role = document.getElementById('roleFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        const badgeStatus = document.getElementById('badgeStatusFilter').value;
+        const hasTrainee = this.value;
+        window.location.href = `?role=${role}&status=${status}&badge_status=${badgeStatus}&has_trainee=${hasTrainee}`;
     });
     document.getElementById('searchBox').addEventListener('input', applyFilters);
     document.getElementById('clearFilters').addEventListener('click', clearFilters);
@@ -733,6 +785,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectElement.value = originalStatus;
                 updateBadgeStatusColor(selectElement, originalStatus);
                 alert('Error updating badge status: ' + error.message);
+            }
+        });
+    });
+
+    // Role dropdown change handlers
+    document.querySelectorAll('.role-select').forEach(select => {
+        select.addEventListener('change', async function() {
+            const staffId = this.dataset.staffId;
+            const newRole = this.value;
+            const originalRole = this.dataset.original;
+            const selectElement = this;
+
+            try {
+                const response = await fetch('{% url "update_advanced_staff_role" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        staff_id: parseInt(staffId),
+                        role: newRole
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    selectElement.dataset.original = newRole;
+                    selectElement.closest('tr').dataset.role = newRole;
+                } else {
+                    selectElement.value = originalRole;
+                    alert(result.error || 'Failed to update role');
+                }
+            } catch (error) {
+                selectElement.value = originalRole;
+                alert('Error updating role: ' + error.message);
             }
         });
     });

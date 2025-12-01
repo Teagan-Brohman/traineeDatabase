@@ -84,6 +84,7 @@ class Trainee(models.Model):
     last_name = models.CharField(max_length=100, db_index=True)
     cohort = models.ForeignKey(Cohort, on_delete=models.PROTECT, related_name='trainees', db_index=True)
     date_added = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:

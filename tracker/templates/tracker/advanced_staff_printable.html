@@ -303,6 +303,15 @@
         <div class="panel-title">⚙️ Display Settings</div>
         <div class="panel-controls">
             <div class="control-group">
+                <label for="sortSelect">Sort Order:</label>
+                <select id="sortSelect" class="control-select">
+                    <option value="name-vertical">Name (Alphabetical) - Vertical</option>
+                    <option value="name-horizontal" selected>Name (Alphabetical) - Horizontal</option>
+                    <option value="badge-vertical">Badge Number - Vertical</option>
+                    <option value="badge-horizontal">Badge Number - Horizontal</option>
+                </select>
+            </div>
+            <div class="control-group">
                 <label for="fontSizeSelect">Font Size:</label>
                 <select id="fontSizeSelect" class="control-select">
                     <option value="7">Extra Small (7pt)</option>
@@ -357,7 +366,10 @@
 
     <div class="staff-grid">
         {% for staff in staff_list %}
-        <div class="staff-item{% if staff.has_escort %} has-escort{% endif %}">
+        <div class="staff-item{% if staff.has_escort %} has-escort{% endif %}"
+             data-badge="{{ staff.badge_number }}"
+             data-name="{{ staff.full_name|lower }}"
+             data-has-escort="{{ staff.has_escort|lower }}">
             <div class="badge">{{ staff.badge_number }}</div>
             <div class="name">{{ staff.full_name }}</div>
         </div>
@@ -385,6 +397,7 @@
 
     <script>
         // Customization settings with localStorage persistence
+        const sortSelect = document.getElementById('sortSelect');
         const fontSizeSelect = document.getElementById('fontSizeSelect');
         const columnSelect = document.getElementById('columnSelect');
         const badgeWidthSelect = document.getElementById('badgeWidthSelect');
@@ -395,6 +408,7 @@
 
         // Default settings
         const defaults = {
+            sortOrder: 'name-horizontal',
             fontSize: '8',
             columns: '4',
             badgeWidth: '50'
@@ -402,16 +416,19 @@
 
         // Load settings from localStorage
         function loadSettings() {
+            const savedSortOrder = localStorage.getItem('staffList_sortOrder') || defaults.sortOrder;
             const savedFontSize = localStorage.getItem('staffList_fontSize') || defaults.fontSize;
             const savedColumns = localStorage.getItem('staffList_columns') || defaults.columns;
             const savedBadgeWidth = localStorage.getItem('staffList_badgeWidth') || defaults.badgeWidth;
 
             // Set select values
+            sortSelect.value = savedSortOrder;
             fontSizeSelect.value = savedFontSize;
             columnSelect.value = savedColumns;
             badgeWidthSelect.value = savedBadgeWidth;
 
             // Apply settings
+            applySortOrder(savedSortOrder);
             applyFontSize(savedFontSize);
             applyColumnCount(savedColumns);
             applyBadgeWidth(savedBadgeWidth);
@@ -420,6 +437,39 @@
         // Save setting to localStorage
         function saveSetting(key, value) {
             localStorage.setItem(key, value);
+        }
+
+        // Apply sort order
+        function applySortOrder(sortOrder) {
+            const [sortBy, flowDirection] = sortOrder.split('-');
+            const itemsArray = Array.from(staffGrid.querySelectorAll('.staff-item'));
+
+            itemsArray.sort((a, b) => {
+                if (sortBy === 'name') {
+                    return a.dataset.name.localeCompare(b.dataset.name);
+                } else if (sortBy === 'badge') {
+                    const badgeA = parseBadgeNumber(a.dataset.badge);
+                    const badgeB = parseBadgeNumber(b.dataset.badge);
+                    return badgeA - badgeB;
+                }
+                return 0;
+            });
+
+            staffGrid.innerHTML = '';
+            itemsArray.forEach(item => staffGrid.appendChild(item));
+
+            if (flowDirection === 'vertical') {
+                staffGrid.style.gridAutoFlow = 'column';
+            } else {
+                staffGrid.style.gridAutoFlow = 'row';
+            }
+        }
+
+        // Parse badge number for numeric sorting
+        function parseBadgeNumber(badge) {
+            const cleaned = badge.replace(/^#/, '');
+            const match = cleaned.match(/^(\d+)/);
+            return match ? parseInt(match[1], 10) : 0;
         }
 
         // Apply font size to staff items
@@ -443,20 +493,28 @@
 
         // Reset to defaults
         function resetSettings() {
+            localStorage.removeItem('staffList_sortOrder');
             localStorage.removeItem('staffList_fontSize');
             localStorage.removeItem('staffList_columns');
             localStorage.removeItem('staffList_badgeWidth');
 
+            sortSelect.value = defaults.sortOrder;
             fontSizeSelect.value = defaults.fontSize;
             columnSelect.value = defaults.columns;
             badgeWidthSelect.value = defaults.badgeWidth;
 
+            applySortOrder(defaults.sortOrder);
             applyFontSize(defaults.fontSize);
             applyColumnCount(defaults.columns);
             applyBadgeWidth(defaults.badgeWidth);
         }
 
         // Event listeners
+        sortSelect.addEventListener('change', function() {
+            saveSetting('staffList_sortOrder', this.value);
+            applySortOrder(this.value);
+        });
+
         fontSizeSelect.addEventListener('change', function() {
             const size = this.value;
             saveSetting('staffList_fontSize', size);

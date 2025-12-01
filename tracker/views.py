@@ -888,6 +888,8 @@ def advanced_staff_main(request):
     # Get filter parameters
     role_filter = request.GET.get('role', '')
     status_filter = request.GET.get('status', 'active')  # active, removed, all
+    badge_status_filter = request.GET.get('badge_status', '')
+    has_trainee_filter = request.GET.get('has_trainee', 'all')  # all, yes, no
 
     # Base queryset
     if status_filter == 'removed':
@@ -903,15 +905,37 @@ def advanced_staff_main(request):
     trainees = Trainee.objects.filter(is_active=True).select_related('cohort')
 
     # Build lookup dict: normalized_badge -> (trainee, progress_percentage)
+    from .utils import normalize_badge_for_advanced
     trainee_lookup = {}
     for trainee in trainees:
-        normalized_badge = trainee.badge_number.lstrip('#')
+        normalized_badge = normalize_badge_for_advanced(trainee.badge_number)
         progress = trainee.get_progress_percentage()
         trainee_lookup[normalized_badge] = (trainee, progress)
 
     # Apply role filter if specified
     if role_filter:
         staff_qs = staff_qs.filter(role=role_filter)
+
+    # Apply badge status filter if specified
+    if badge_status_filter:
+        staff_qs = staff_qs.filter(badge_status=badge_status_filter)
+
+    # Apply has_trainee filter if specified
+    if has_trainee_filter != 'all':
+        from .utils import normalize_badge_for_trainee
+        staff_badges = list(staff_qs.values_list('badge_number', flat=True))
+        normalized_badges = [normalize_badge_for_trainee(b) for b in staff_badges]
+
+        existing_trainee_badges = Trainee.objects.filter(
+            badge_number__in=normalized_badges
+        ).values_list('badge_number', flat=True)
+
+        adv_format_badges = [b.lstrip('#') for b in existing_trainee_badges]
+
+        if has_trainee_filter == 'yes':
+            staff_qs = staff_qs.filter(badge_number__in=adv_format_badges)
+        else:  # 'no'
+            staff_qs = staff_qs.exclude(badge_number__in=adv_format_badges)
 
     # Prefetch trainings for efficiency
     staff_list = staff_qs.prefetch_related(
@@ -923,7 +947,7 @@ def advanced_staff_main(request):
     for staff in staff_list:
         if staff.badge_status == 'badging_in_progress':
             # Normalize badge number for comparison
-            normalized_badge = staff.badge_number.lstrip('#')
+            normalized_badge = normalize_badge_for_advanced(staff.badge_number)
 
             # Check if matching trainee exists with 100% completion
             if normalized_badge in trainee_lookup:
@@ -975,8 +999,16 @@ def advanced_staff_main(request):
         'badge_status_choices': badge_status_choices,
         'role_filter': role_filter,
         'status_filter': status_filter,
+        'badge_status_filter': badge_status_filter,
+        'has_trainee_filter': has_trainee_filter,
         'page_title': 'Advanced Training Management',
         'user_initials': user_initials,
+        'filters': {
+            'role': role_filter,
+            'status': status_filter,
+            'badge_status': badge_status_filter,
+            'has_trainee': has_trainee_filter,
+        }
     }
     return render(request, 'tracker/advanced_staff_main.html', context)
 
@@ -1207,6 +1239,55 @@ def update_advanced_staff_status(request):
 
 
 @login_required
+def update_advanced_staff_role(request):
+    """AJAX endpoint to update role for an advanced staff member."""
+    from django.http import JsonResponse
+    from .models import AdvancedStaff
+    import json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST request required'}, status=405)
+
+    # Check permission
+    if not (request.user.is_superuser or request.user.has_perm('tracker.manage_advanced_training')):
+        return JsonResponse({
+            'success': False,
+            'error': 'You do not have permission to update staff records. Please contact an administrator.'
+        }, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    staff_id = data.get('staff_id')
+    role = data.get('role')
+
+    if not staff_id or not role:
+        return JsonResponse({'success': False, 'error': 'staff_id and role are required'}, status=400)
+
+    # Validate role
+    valid_roles = [choice[0] for choice in AdvancedStaff.ROLE_CHOICES]
+    if role not in valid_roles:
+        return JsonResponse({'success': False, 'error': f'Invalid role. Must be one of: {valid_roles}'}, status=400)
+
+    try:
+        staff = AdvancedStaff.objects.get(id=staff_id)
+        staff.role = role
+        staff.save(update_fields=['role'])
+
+        return JsonResponse({
+            'success': True,
+            'role': staff.role,
+            'role_display': staff.get_role_display(),
+        })
+    except AdvancedStaff.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Staff member not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
 def advanced_staff_printable_list(request):
     """
     Generate a printable single-page list of all active staff.
@@ -1362,8 +1443,9 @@ def import_trainees_to_advanced(request):
     try:
         with transaction.atomic():
             for trainee in to_import:
-                # Strip # from badge number if present
-                badge_number = trainee.badge_number.lstrip('#')
+                # Normalize badge number using utility function
+                from .utils import normalize_badge_for_advanced
+                badge_number = normalize_badge_for_advanced(trainee.badge_number)
 
                 AdvancedStaff.objects.create(
                     badge_number=badge_number,
