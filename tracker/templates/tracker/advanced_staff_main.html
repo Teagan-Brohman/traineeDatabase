@@ -87,7 +87,7 @@
                             </a>
                         </td>
                         <td class="sticky-col badge-status-cell">
-                            <select class="badge-status-select"
+                            <select class="badge-status-select status-{{ item.staff.badge_status }}"
                                     data-staff-id="{{ item.staff.id }}"
                                     data-original="{{ item.staff.badge_status }}">
                                 {% for status_code, status_name in badge_status_choices %}
@@ -275,6 +275,8 @@ Click to edit">
     background: white;
     min-width: 130px;
     cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .badge-status-select:hover {
@@ -285,6 +287,37 @@ Click to edit">
     outline: none;
     border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Badge status color coding */
+.badge-status-select.status-badging_in_progress {
+    background-color: #ffc107;
+    color: #000;
+    border-color: #ff9800;
+}
+
+.badge-status-select.status-ready_to_issue {
+    background-color: #17a2b8;
+    color: white;
+    border-color: #117a8b;
+}
+
+.badge-status-select.status-issued_active {
+    background-color: #28a745;
+    color: white;
+    border-color: #1e7e34;
+}
+
+.badge-status-select.status-terminated {
+    background-color: #dc3545;
+    color: white;
+    border-color: #bd2130;
+}
+
+.badge-status-select.status-onboarding_halted {
+    background-color: #6c757d;
+    color: white;
+    border-color: #545b62;
 }
 
 .search-input {
@@ -623,6 +656,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('searchBox').addEventListener('input', applyFilters);
     document.getElementById('clearFilters').addEventListener('click', clearFilters);
 
+    // Helper function to update badge status dropdown color
+    function updateBadgeStatusColor(selectElement, status) {
+        // Remove all status classes
+        selectElement.classList.remove('status-badging_in_progress', 'status-ready_to_issue',
+                                       'status-issued_active', 'status-terminated', 'status-onboarding_halted');
+        // Add the current status class
+        selectElement.classList.add('status-' + status);
+    }
+
     // Badge status dropdown change handlers
     document.querySelectorAll('.badge-status-select').forEach(select => {
         select.addEventListener('change', async function() {
@@ -642,9 +684,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!confirm(confirmMessage)) {
                     // User cancelled - revert dropdown
                     selectElement.value = originalStatus;
+                    updateBadgeStatusColor(selectElement, originalStatus);
                     return;
                 }
             }
+
+            // Update color immediately for responsive feedback
+            updateBadgeStatusColor(selectElement, newStatus);
 
             try {
                 const response = await fetch('{% url "update_advanced_staff_status" %}', {
@@ -679,11 +725,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     // Revert to original value on error
                     selectElement.value = originalStatus;
+                    updateBadgeStatusColor(selectElement, originalStatus);
                     alert(result.error || 'Failed to update badge status');
                 }
             } catch (error) {
                 // Revert to original value on error
                 selectElement.value = originalStatus;
+                updateBadgeStatusColor(selectElement, originalStatus);
                 alert('Error updating badge status: ' + error.message);
             }
         });
