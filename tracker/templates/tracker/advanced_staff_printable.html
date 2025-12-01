@@ -458,10 +458,20 @@
             staffGrid.innerHTML = '';
             itemsArray.forEach(item => staffGrid.appendChild(item));
 
+            const currentColumns = parseInt(columnSelect.value);
+
             if (flowDirection === 'vertical') {
+                // For vertical flow, calculate rows needed
+                const totalItems = itemsArray.length;
+                const rowsNeeded = Math.ceil(totalItems / currentColumns);
                 staffGrid.style.gridAutoFlow = 'column';
+                staffGrid.style.gridTemplateRows = `repeat(${rowsNeeded}, auto)`;
+                staffGrid.style.gridTemplateColumns = `repeat(${currentColumns}, 1fr)`;
             } else {
+                // For horizontal flow, use default column layout
                 staffGrid.style.gridAutoFlow = 'row';
+                staffGrid.style.gridTemplateRows = 'auto';
+                staffGrid.style.gridTemplateColumns = `repeat(${currentColumns}, 1fr)`;
             }
         }
 
@@ -482,6 +492,8 @@
         // Apply column count to grid
         function applyColumnCount(count) {
             staffGrid.style.gridTemplateColumns = `repeat(${count}, 1fr)`;
+            // Reapply sort order to recalculate rows for vertical flow
+            applySortOrder(sortSelect.value);
         }
 
         // Apply badge width to badge elements
