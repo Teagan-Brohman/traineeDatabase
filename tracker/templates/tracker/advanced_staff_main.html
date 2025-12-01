@@ -727,7 +727,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Get staff name from the row for personalized message
             const row = selectElement.closest('tr');
-            const staffName = row.querySelector('td:nth-child(3)').textContent.trim();
+            const staffName = row.querySelector('td:nth-child(4)').textContent.trim();
 
             // Check if new status requires confirmation
             if (newStatus === 'terminated' || newStatus === 'onboarding_halted') {
