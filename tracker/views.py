@@ -897,6 +897,18 @@ def advanced_staff_main(request):
     else:  # active
         staff_qs = AdvancedStaff.objects.filter(is_active=True)
 
+    # Get all trainees for badge matching
+    from .models import Trainee
+
+    trainees = Trainee.objects.filter(is_active=True).select_related('cohort')
+
+    # Build lookup dict: normalized_badge -> (trainee, progress_percentage)
+    trainee_lookup = {}
+    for trainee in trainees:
+        normalized_badge = trainee.badge_number.lstrip('#')
+        progress = trainee.get_progress_percentage()
+        trainee_lookup[normalized_badge] = (trainee, progress)
+
     # Apply role filter if specified
     if role_filter:
         staff_qs = staff_qs.filter(role=role_filter)
@@ -905,6 +917,24 @@ def advanced_staff_main(request):
     staff_list = staff_qs.prefetch_related(
         Prefetch('trainings', queryset=AdvancedTraining.objects.select_related('training_type'))
     ).order_by('badge_number')
+
+    # Auto-update badge status for staff with badging_in_progress
+    staff_to_update = []
+    for staff in staff_list:
+        if staff.badge_status == 'badging_in_progress':
+            # Normalize badge number for comparison
+            normalized_badge = staff.badge_number.lstrip('#')
+
+            # Check if matching trainee exists with 100% completion
+            if normalized_badge in trainee_lookup:
+                trainee, progress = trainee_lookup[normalized_badge]
+                if progress == 100.0:
+                    staff.badge_status = 'ready_to_issue'
+                    staff_to_update.append(staff)
+
+    # Bulk update if any changes
+    if staff_to_update:
+        AdvancedStaff.objects.bulk_update(staff_to_update, ['badge_status'])
 
     # Get all training types for table headers
     training_types = AdvancedTrainingType.objects.filter(is_active=True).order_by('order')
@@ -1139,13 +1169,36 @@ def update_advanced_staff_status(request):
 
     try:
         staff = AdvancedStaff.objects.get(id=staff_id)
+
+        # Store old values for comparison
+        old_status = staff.badge_status
+        old_is_active = staff.is_active
+
+        # Update badge status
         staff.badge_status = badge_status
-        staff.save(update_fields=['badge_status'])
+
+        # Auto-toggle is_active based on badge status
+        # Set to False for termination statuses
+        if badge_status in ['terminated', 'onboarding_halted']:
+            staff.is_active = False
+        # Set to True for active statuses (only if currently False)
+        elif badge_status in ['ready_to_issue', 'issued_active'] and not staff.is_active:
+            staff.is_active = True
+        # For 'badging_in_progress', don't auto-change is_active
+
+        # Determine which fields changed
+        fields_to_update = ['badge_status']
+        if staff.is_active != old_is_active:
+            fields_to_update.append('is_active')
+
+        staff.save(update_fields=fields_to_update)
 
         return JsonResponse({
             'success': True,
             'badge_status': staff.badge_status,
             'badge_status_display': staff.get_badge_status_display(),
+            'is_active': staff.is_active,
+            'is_active_changed': staff.is_active != old_is_active,
         })
     except AdvancedStaff.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Staff member not found'}, status=404)
@@ -1168,9 +1221,10 @@ def advanced_staff_printable_list(request):
     except AdvancedTrainingType.DoesNotExist:
         escort_type = None
 
-    # Get all active staff, prefetch trainings for efficiency
+    # Get all active staff with issued badges, prefetch trainings for efficiency
     staff_members = AdvancedStaff.objects.filter(
-        is_active=True
+        is_active=True,
+        badge_status='issued_active'
     ).prefetch_related(
         'trainings__training_type'
     ).order_by('last_name', 'first_name')

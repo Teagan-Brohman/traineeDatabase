@@ -631,6 +631,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const originalStatus = this.dataset.original;
             const selectElement = this;
 
+            // Get staff name from the row for personalized message
+            const row = selectElement.closest('tr');
+            const staffName = row.querySelector('td:nth-child(3)').textContent.trim();
+
+            // Check if new status requires confirmation
+            if (newStatus === 'terminated' || newStatus === 'onboarding_halted') {
+                const confirmMessage = `This will mark ${staffName} as inactive and remove them from active staff lists. This action will affect their access to training records. Are you sure?`;
+
+                if (!confirm(confirmMessage)) {
+                    // User cancelled - revert dropdown
+                    selectElement.value = originalStatus;
+                    return;
+                }
+            }
+
             try {
                 const response = await fetch('{% url "update_advanced_staff_status" %}', {
                     method: 'POST',
@@ -646,9 +661,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const result = await response.json();
                 if (result.success) {
-                    // Update the data attribute and original value
+                    // Update the data attributes
                     selectElement.dataset.original = newStatus;
                     selectElement.closest('tr').dataset.badgeStatus = newStatus;
+
+                    // Update row's is_active attribute if it changed
+                    if (result.is_active !== undefined) {
+                        row.dataset.active = result.is_active.toString();
+
+                        // Optional: Visual feedback for inactive staff
+                        if (!result.is_active) {
+                            row.style.opacity = '0.6';
+                        } else {
+                            row.style.opacity = '1.0';
+                        }
+                    }
                 } else {
                     // Revert to original value on error
                     selectElement.value = originalStatus;
